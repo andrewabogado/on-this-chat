@@ -1,0 +1,121 @@
+/* Sidebar Container */
+#chatgpt-toc-sidebar {
+  position: fixed;
+  top: 60px;
+  /* Below the header usually */
+  right: 20px;
+  width: 250px;
+  max-height: calc(100vh - 100px);
+  background: rgba(32, 33, 35, 0.95);
+  /* Dark mode compatible background */
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 16px;
+  overflow-y: auto;
+  z-index: 9999;
+  color: #ececf1;
+  font-family: 'Söhne', 'ui-sans-serif', 'system-ui', -apple-system, 'Segoe UI', Roboto, Ubuntu, Cantarell, 'Noto Sans', sans-serif;
+  font-size: 14px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  transition: opacity 0.3s ease;
+}
+
+/* Header */
+#chatgpt-toc-sidebar h2 {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0;
+  color: #fff;
+}
+
+/* List Items */
+.toc-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.toc-item {
+  margin-bottom: 4px;
+}
+
+.toc-link {
+  display: block;
+  text-decoration: none;
+  color: #acacbe;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+  border-left: 2px solid transparent;
+  /* Prepare for active border */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+
+.toc-link:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+/* Active State - "Scroll Spy" Effect */
+.toc-link.active {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.15);
+  border-left-color: #10a37f;
+  /* OpenAP Green or just white? User said "mimic interaction", usually means color accent */
+  font-weight: 500;
+}
+
+
+/* User Messages (Top Level) */
+.toc-item.user-message>.toc-link {
+  font-weight: 500;
+  color: #fff;
+}
+
+.toc-item.user-message>.toc-link.active {
+  color: #10a37f;
+  /* Highlight query slightly differently if active */
+}
+
+
+/* Assistant Sub-headers (Nested) */
+.toc-sublist {
+  list-style: none;
+  padding-left: 16px;
+  /* Increased indentation */
+  margin-top: 4px;
+  border-left: 2px solid rgba(255, 255, 255, 0.1);
+  /* Thicker guide line */
+  margin-left: 6px;
+}
+
+.toc-item.sub-header>.toc-link {
+  font-size: 13px;
+  color: #8e8ea0;
+}
+
+.toc-item.sub-header>.toc-link:hover {
+  color: #d9d9e3;
+}
+
+/* Scrollbar */
+#chatgpt-toc-sidebar::-webkit-scrollbar {
+  width: 6px;
+}
+
+#chatgpt-toc-sidebar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+#chatgpt-toc-sidebar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 3px;
+}
+
+#chatgpt-toc-sidebar::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
