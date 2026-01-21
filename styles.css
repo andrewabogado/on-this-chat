@@ -1,39 +1,53 @@
 /* Sidebar Container */
 #chatgpt-toc-sidebar {
   position: fixed;
-  top: 60px;
-  /* Below the header usually */
+  top: 80px;
+  /* Lower it slightly */
   right: 20px;
-  width: 250px;
-  max-height: calc(100vh - 100px);
-  background: rgba(255, 255, 255, 0.95);
-  /* Light mode background */
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(0, 0, 0, 0.08);
-  /* Light border */
-  border-radius: 12px;
-  padding: 16px;
+  width: 240px;
+  max-height: calc(100vh - 120px);
+  background: transparent;
+  /* Minimal transparent background */
+  /* backdrop-filter: blur(10px); Remove blur for cleaner "floating text" look, or keep? Reference image looks like it's just on the page. 
+     Let's keep a very subtle background for readability overlaying potential content, or full transparent if it's in blank space. 
+     ChatGPT sidebar usually needs a bg. Let's make it very subtle. */
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(5px);
+
+  /* Remove heavy border */
+  border: none;
+  border-radius: 8px;
+  padding: 12px;
   overflow-y: auto;
   z-index: 9999;
-  color: #374151;
-  /* Dark text */
-  font-family: 'Söhne', 'ui-sans-serif', 'system-ui', -apple-system, 'Segoe UI', Roboto, Ubuntu, Cantarell, 'Noto Sans', sans-serif;
-  font-size: 14px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-  /* Softer shadow */
+
+  /* Font Updates */
+  color: #6b7280;
+  /* Gray-500 - simpler text color */
+  font-family: inherit;
+  font-size: 12px;
+  /* Requested 12px */
+
+  /* Minimal shadow or none? Reference looks flat. Let's do none or super minimal */
+  box-shadow: none;
   transition: opacity 0.3s ease;
+  display: none;
 }
 
 /* Header */
 #chatgpt-toc-sidebar h2 {
-  font-size: 16px;
-  font-weight: 600;
-  margin: 0;
-  color: #111827;
-  /* Darker header */
+  font-size: 13px;
+  /* Slightly bumped for readability vs 12px body? Or keep 12? User said 12 before. Let's stick to 12 but Ensure it looks good. */
+  font-weight: 400;
+  /* Normal */
+  margin: 0 0 8px 0;
+  color: #737373;
+  /* Requested color */
+  /* text-transform: removed */
+  letter-spacing: normal;
 }
 
-/* Build List */
+/* List Items */
 .toc-list {
   list-style: none;
   padding: 0;
@@ -41,81 +55,123 @@
 }
 
 .toc-item {
-  margin-bottom: 4px;
+  margin-bottom: 0px;
+  /* Tighter list */
+  position: relative;
+}
+
+/* Flex container for the parent row */
+.toc-item-row {
+  display: flex;
+  align-items: center;
+  border-radius: 4px;
+  padding: 2px 0;
+  /* Vertical padding */
+  padding-left: 2px;
+}
+
+.toc-item.user-message>.toc-item-row:hover {
+  background: rgba(0, 0, 0, 0.03);
+}
+
+.toc-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  color: #9ca3af;
+  font-size: 9px;
+  transition: transform 0.2s;
+  flex-shrink: 0;
+  user-select: none;
+}
+
+.toc-toggle:hover {
+  color: #4b5563;
+}
+
+.toc-toggle.collapsed {
+  transform: rotate(-90deg);
 }
 
 .toc-link {
   display: block;
   text-decoration: none;
-  color: #6b7280;
-  /* Gray text for inactive */
-  padding: 6px 10px;
-  /* Slightly more padding for touch/click area */
-  border-radius: 6px;
-  transition: all 0.2s ease;
-  border-left: 3px solid transparent;
+  color: #737373;
+  /* Requested color */
+  padding: 3px 6px;
+  border-radius: 4px;
+  transition: color 0.1s ease;
+  border-left: 2px solid transparent;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   cursor: pointer;
+  flex-grow: 1;
+  font-size: 12px;
+  line-height: 1.5;
+  font-weight: 400;
+  /* Normal weight */
 }
 
-.toc-link:hover {
-  background: rgba(0, 0, 0, 0.04);
-  color: #111827;
-}
-
-/* Active State - "Scroll Spy" Effect */
+/* Active State Styles */
 .toc-link.active {
   color: #111827;
-  background: #f3f4f6;
-  /* Very light gray background */
-  border-left-color: #10a37f;
-  /* Loop back to brand color or keep it specific? Keeping brand green for active indicator */
-  font-weight: 500;
+  font-weight: 400;
+  /* Normal */
 }
 
 /* User Messages (Top Level) */
-.toc-item.user-message>.toc-link {
-  font-weight: 600;
-  color: #374151;
+.toc-item.user-message>.toc-item-row>.toc-link {
+  font-weight: 400;
+  /* Normal */
+  color: #737373;
 }
 
-.toc-item.user-message>.toc-link.active {
-  color: #10a37f;
-  background: #ecfdf5;
-  /* Subtle green tint for active user message? Or just gray. Let's stick to gray for consistency, maybe slight tint if desired. */
-  background: #f3f4f6;
+.toc-item.user-message>.toc-item-row>.toc-link.active {
+  color: #111827;
+  border-left-color: #10a37f;
 }
 
 /* Assistant Sub-headers (Nested) */
 .toc-sublist {
   list-style: none;
-  padding-left: 16px;
-  margin-top: 4px;
-  border-left: 2px solid rgba(0, 0, 0, 0.05);
-  /* Light guide line */
-  margin-left: 6px;
+  padding-left: 8px;
+  margin-top: 1px;
+  border-left: 1px solid #e5e7eb;
+  margin-left: 9px;
+  display: block;
+  overflow: hidden;
 }
 
-.toc-item.sub-header>.toc-link {
-  font-size: 13px;
-  color: #9ca3af;
-  /* Lighter gray for sub-items */
+.toc-sublist.collapsed {
+  display: none;
 }
 
-.toc-item.sub-header>.toc-link:hover {
-  color: #4b5563;
+/* Sub-items */
+.toc-item.sub-header>.toc-item-row>.toc-link {
+  font-size: 12px;
+  color: #737373;
+  padding-left: 8px;
 }
 
-.toc-item.sub-header>.toc-link.active {
+.toc-item.sub-header>.toc-item-row>.toc-link:hover {
   color: #111827;
-  background: #f3f4f6;
+}
+
+.toc-item.sub-header>.toc-item-row>.toc-link.active {
+  color: #111827;
+  font-weight: 400;
+  /* Normal */
+  border-left-color: #10a37f;
 }
 
 /* Scrollbar */
 #chatgpt-toc-sidebar::-webkit-scrollbar {
-  width: 6px;
+  width: 4px;
+  /* Thinner */
 }
 
 #chatgpt-toc-sidebar::-webkit-scrollbar-track {
@@ -124,7 +180,7 @@
 
 #chatgpt-toc-sidebar::-webkit-scrollbar-thumb {
   background: rgba(0, 0, 0, 0.1);
-  border-radius: 3px;
+  border-radius: 2px;
 }
 
 #chatgpt-toc-sidebar::-webkit-scrollbar-thumb:hover {

@@ -121,30 +121,30 @@
     headerDiv.style.display = 'flex';
     headerDiv.style.justifyContent = 'space-between';
     headerDiv.style.alignItems = 'center';
-    headerDiv.style.marginBottom = '12px';
-    headerDiv.style.borderBottom = '1px solid rgba(0, 0, 0, 0.1)';
-    headerDiv.style.paddingBottom = '8px';
+    headerDiv.style.marginBottom = '8px'; // Reduced margin since no border
+    headerDiv.style.borderBottom = 'none'; // Removed border
+    headerDiv.style.paddingBottom = '0px';
 
     const titleEl = document.createElement('h2');
-    titleEl.innerText = 'Table of Contents';
+    titleEl.innerText = 'On this page'; // Sentence case
     titleEl.style.margin = '0';
     titleEl.style.border = 'none';
 
     // --- Buttons Container ---
     const btnContainer = document.createElement('div');
     btnContainer.style.display = 'flex';
-    btnContainer.style.gap = '8px';
+    btnContainer.style.gap = '4px'; // Closer gap
 
     // Refresh Button
     const refreshBtn = document.createElement('button');
     refreshBtn.innerText = '↻';
     refreshBtn.title = 'Refresh TOC';
     refreshBtn.style.background = 'transparent';
-    refreshBtn.style.border = '1px solid rgba(0, 0, 0, 0.2)';
-    refreshBtn.style.color = '#374151';
+    refreshBtn.style.border = 'none'; // Removed border
+    refreshBtn.style.color = '#737373'; // Match header color
     refreshBtn.style.borderRadius = '4px';
     refreshBtn.style.cursor = 'pointer';
-    refreshBtn.style.padding = '2px 8px';
+    refreshBtn.style.padding = '2px 6px';
     refreshBtn.style.fontSize = '14px';
     refreshBtn.onclick = () => {
       refreshBtn.innerText = '...';
@@ -159,12 +159,12 @@
     closeBtn.innerText = '×';
     closeBtn.title = 'Close TOC';
     closeBtn.style.background = 'transparent';
-    closeBtn.style.border = '1px solid rgba(0, 0, 0, 0.2)';
-    closeBtn.style.color = '#374151';
+    closeBtn.style.border = 'none'; // Removed border
+    closeBtn.style.color = '#737373';
     closeBtn.style.borderRadius = '4px';
     closeBtn.style.cursor = 'pointer';
-    closeBtn.style.padding = '2px 8px';
-    closeBtn.style.fontSize = '16px';
+    closeBtn.style.padding = '2px 6px';
+    closeBtn.style.fontSize = '18px'; // Slightly larger for X check
     closeBtn.style.lineHeight = '14px';
     closeBtn.onclick = () => {
       container.style.display = 'none';
@@ -187,35 +187,72 @@
       const item = document.createElement('li');
       item.className = 'toc-item user-message';
 
+      const row = document.createElement('div');
+      row.className = 'toc-item-row';
+
+      // Toggle (only if children exist)
+      const hasChildren = section.children.length > 0;
+      let toggle = null;
+
+      if (hasChildren) {
+        toggle = document.createElement('span');
+        toggle.className = 'toc-toggle';
+        toggle.innerText = '▼'; // Down arrow
+        toggle.onclick = (e) => {
+          e.stopPropagation();
+          const subList = item.querySelector('.toc-sublist');
+          if (subList) {
+            const isCollapsed = subList.classList.toggle('collapsed');
+            toggle.classList.toggle('collapsed', isCollapsed);
+          }
+        };
+        row.appendChild(toggle);
+      } else {
+        // Spacer for alignment if no children, essentially invisible toggle
+        const spacer = document.createElement('span');
+        spacer.className = 'toc-toggle';
+        spacer.style.cursor = 'default';
+        row.appendChild(spacer);
+      }
+
       const link = document.createElement('span');
       link.className = 'toc-link';
       link.innerText = section.title;
-      link.dataset.target = section.id; // For Scroll Spy
+      link.dataset.target = section.id;
       link.onclick = () => {
         section.element.scrollIntoView({ behavior: 'smooth', block: 'start' });
       };
 
-      item.appendChild(link);
+      row.appendChild(link);
+      item.appendChild(row);
 
       // Sub-items (Assistant Headers)
-      if (section.children.length > 0) {
+      if (hasChildren) {
         const subList = document.createElement('ul');
         subList.className = 'toc-sublist';
+        // Default execution: Expanded or Collapsed?
+        // User image shows tree. Let's keep expanded by default for discoverability, 
+        // or collapse to keep it clean. Let's start Expanded.
 
         section.children.forEach(child => {
           const subItem = document.createElement('li');
           subItem.className = 'toc-item sub-header';
 
+          // Sub-item also in a row for potential future nested alignment
+          const subRow = document.createElement('div');
+          subRow.className = 'toc-item-row';
+
           const subLink = document.createElement('span');
           subLink.className = 'toc-link';
           subLink.innerText = child.title;
-          subLink.dataset.target = child.id; // For Scroll Spy
+          subLink.dataset.target = child.id;
           subLink.onclick = (e) => {
             e.stopPropagation();
             child.element.scrollIntoView({ behavior: 'smooth', block: 'center' });
           };
 
-          subItem.appendChild(subLink);
+          subRow.appendChild(subLink);
+          subItem.appendChild(subRow);
           subList.appendChild(subItem);
         });
         item.appendChild(subList);
@@ -262,8 +299,22 @@
     const link = document.querySelector(`.toc-link[data-target="${targetId}"]`);
     if (link) {
       link.classList.add('active');
-      // Auto-scroll sidebar if needed
+
+      // Highlight row background if we want, or just text. Content logic sets class on link.
+      // Auto-scroll sidebar logic:
       link.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+      // Auto-expand parent if collapsed
+      const parentSublist = link.closest('.toc-sublist');
+      if (parentSublist && parentSublist.classList.contains('collapsed')) {
+        parentSublist.classList.remove('collapsed');
+        // Also rotate the toggle
+        const parentItem = parentSublist.closest('.toc-item');
+        if (parentItem) {
+          const toggle = parentItem.querySelector('.toc-toggle');
+          if (toggle) toggle.classList.remove('collapsed');
+        }
+      }
     }
   }
 
