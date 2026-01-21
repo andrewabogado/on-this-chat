@@ -68,7 +68,8 @@
 }
 
 .toc-item.user-message>.toc-item-row:hover {
-  background: rgba(0, 0, 0, 0.03);
+  /* No background hover */
+  background: transparent;
 }
 
 .toc-toggle {
@@ -96,6 +97,10 @@
   font-weight: 400;
 }
 
+.toc-link:hover {
+  color: #111827;
+}
+
 /* Active State Styles */
 .toc-link.active {
   color: #111827;
@@ -111,8 +116,8 @@
 
 .toc-item.user-message>.toc-item-row>.toc-link.active {
   color: #111827;
-  font-weight: 600;
-  /* Bold for active top level */
+  font-weight: 500;
+  /* Semi-bold like sub-items */
 }
 
 /* Assistant Sub-headers (Nested) */
