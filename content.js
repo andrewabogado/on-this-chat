@@ -128,12 +128,18 @@
     titleEl.style.margin = '0';
     titleEl.style.border = 'none';
 
+    // --- Buttons Container ---
+    const btnContainer = document.createElement('div');
+    btnContainer.style.display = 'flex';
+    btnContainer.style.gap = '8px';
+
+    // Refresh Button
     const refreshBtn = document.createElement('button');
     refreshBtn.innerText = '↻';
     refreshBtn.title = 'Refresh TOC';
     refreshBtn.style.background = 'transparent';
     refreshBtn.style.border = '1px solid rgba(0, 0, 0, 0.2)';
-    refreshBtn.style.color = '#374151'; // Dark text for light mode
+    refreshBtn.style.color = '#374151';
     refreshBtn.style.borderRadius = '4px';
     refreshBtn.style.cursor = 'pointer';
     refreshBtn.style.padding = '2px 8px';
@@ -146,8 +152,28 @@
       }, 100);
     };
 
+    // Close Button
+    const closeBtn = document.createElement('button');
+    closeBtn.innerText = '×';
+    closeBtn.title = 'Close TOC';
+    closeBtn.style.background = 'transparent';
+    closeBtn.style.border = '1px solid rgba(0, 0, 0, 0.2)';
+    closeBtn.style.color = '#374151';
+    closeBtn.style.borderRadius = '4px';
+    closeBtn.style.cursor = 'pointer';
+    closeBtn.style.padding = '2px 8px';
+    closeBtn.style.fontSize = '16px';
+    closeBtn.style.lineHeight = '14px';
+    closeBtn.onclick = () => {
+      container.style.display = 'none';
+      ensureToggleBtn();
+    };
+
+    btnContainer.appendChild(refreshBtn);
+    btnContainer.appendChild(closeBtn);
+
     headerDiv.appendChild(titleEl);
-    headerDiv.appendChild(refreshBtn);
+    headerDiv.appendChild(btnContainer);
     container.appendChild(headerDiv);
 
     // 3. Build List
@@ -254,6 +280,41 @@
         if (child.element) spyObserver.observe(child.element);
       });
     });
+  }
+
+  function ensureToggleBtn() {
+    let toggle = document.getElementById('chatgpt-toc-toggle');
+    if (!toggle) {
+      toggle = document.createElement('div');
+      toggle.id = 'chatgpt-toc-toggle';
+      toggle.innerText = 'M'; // "Menu" or icon? Let's use '≣' or 'TOC'
+      toggle.innerText = '≣';
+      toggle.style.position = 'fixed';
+      toggle.style.top = '100px';
+      toggle.style.right = '0'; // Hug right edge
+      toggle.style.padding = '10px 14px';
+      toggle.style.background = 'rgba(255, 255, 255, 0.9)';
+      toggle.style.border = '1px solid rgba(0,0,0,0.1)';
+      toggle.style.borderRight = 'none';
+      toggle.style.borderTopLeftRadius = '8px';
+      toggle.style.borderBottomLeftRadius = '8px';
+      toggle.style.cursor = 'pointer';
+      toggle.style.boxShadow = '-2px 2px 5px rgba(0,0,0,0.05)';
+      toggle.style.zIndex = '9998';
+      toggle.style.color = '#333';
+      toggle.style.fontWeight = 'bold';
+      toggle.style.fontSize = '18px';
+      toggle.onclick = () => {
+        const container = document.getElementById(SETTINGS.sidebarId);
+        if (container) {
+          container.style.display = 'block';
+          toggle.style.display = 'none';
+        }
+      };
+      document.body.appendChild(toggle);
+    } else {
+      toggle.style.display = 'block';
+    }
   }
 
   // --- Initialization ---
