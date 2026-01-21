@@ -354,8 +354,8 @@
     if (isManualScrolling) return;
 
     const scrollY = window.scrollY;
-    // Offset to trigger activation (e.g., 100px from top)
-    const offset = 100;
+    // active state if its top is roughly in the top 20% of the viewport.
+    const offset = window.innerHeight * 0.2;
     let activeId = null;
 
     // Flatten structure to find candidates
