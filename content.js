@@ -21,6 +21,8 @@
 
   let observer = null;
   let debounceTimer = null;
+  let isManualScrolling = false;
+  let scrollTimeout = null;
 
   // --- Core Logic ---
 
@@ -99,6 +101,28 @@
     });
 
     return structure;
+  }
+
+  /**
+   * Helper to perform offset scrolling
+   */
+  function scrollToElement(element, id) {
+    if (!element) return;
+    isManualScrolling = true;
+    clearTimeout(scrollTimeout);
+
+    // Immediate UI update
+    setActiveLink(id, true); // true = skip scrolling sidebar
+
+    // Calculate position - 100px offset (to clear fixed top areas and enter Observer zone)
+    const y = element.getBoundingClientRect().top + window.scrollY - 100;
+
+    window.scrollTo({ top: y, behavior: 'smooth' });
+
+    // Reset lock after animation
+    scrollTimeout = setTimeout(() => {
+      isManualScrolling = false;
+    }, 1000);
   }
 
   /**
@@ -199,8 +223,7 @@
       link.innerText = section.title;
       link.dataset.target = section.id;
       link.onclick = (e) => {
-        // Scroll to content
-        section.element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        scrollToElement(section.element, section.id);
       };
 
       row.appendChild(link);
@@ -225,7 +248,7 @@
           subLink.dataset.target = child.id;
           subLink.onclick = (e) => {
             e.stopPropagation();
-            child.element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            scrollToElement(child.element, child.id);
           };
 
           subRow.appendChild(subLink);
@@ -320,6 +343,8 @@
   };
 
   const spyObserver = new IntersectionObserver((entries) => {
+    if (isManualScrolling) return; // Skip updates during manual scroll
+
     entries.forEach(entry => {
       if (entry.isIntersecting) {
         setActiveLink(entry.target.id);
@@ -327,7 +352,7 @@
     });
   }, spyOptions);
 
-  function setActiveLink(targetId) {
+  function setActiveLink(targetId, skipScroll = false) {
     if (!targetId) return;
 
     // Remove current active
@@ -341,7 +366,9 @@
       // Expand logic removed - everything is always visible
 
       // Auto-scroll sidebar logic:
-      link.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      if (!skipScroll) {
+        link.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
     }
   }
 
