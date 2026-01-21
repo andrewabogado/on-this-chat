@@ -357,12 +357,21 @@
     // Remove current active
     document.querySelectorAll('.toc-link.active').forEach(el => el.classList.remove('active'));
 
-    // Add new active
+    // 1. Find the target link
     const link = document.querySelector(`.toc-link[data-target="${targetId}"]`);
     if (link) {
       link.classList.add('active');
 
-      // Expand logic removed - everything is always visible
+      // 2. Manage Expansion (Exclusive Accordion)
+      const parentItem = link.closest('.toc-item.user-message');
+      if (parentItem) {
+        // Collapse all others
+        document.querySelectorAll('.toc-item.user-message.expanded').forEach(el => {
+          if (el !== parentItem) el.classList.remove('expanded');
+        });
+        // Expand current
+        parentItem.classList.add('expanded');
+      }
 
       // Auto-scroll sidebar logic:
       if (!skipScroll) {

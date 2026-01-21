@@ -134,8 +134,12 @@
   margin-top: 1px;
   border: none;
   /* No border */
+  display: none;
+  /* Hidden by default */
+}
+
+.toc-item.user-message.expanded .toc-sublist {
   display: block;
-  /* Always visible */
 }
 
 /* Sub-items */
