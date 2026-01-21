@@ -106,6 +106,8 @@
    * @param {Array} structure 
    */
   function renderSidebar(structure) {
+    if (!document.body) return; // Safety check
+
     // 1. Create or Clear Container
     let container = document.getElementById(SETTINGS.sidebarId);
     if (!container) {
@@ -319,26 +321,80 @@
 
   // --- Initialization ---
 
+  // --- Header Integration ---
+
+  function injectHeaderButton() {
+    if (!document.body) return;
+    if (document.getElementById('chatgpt-toc-header-btn')) return;
+
+    // Strategy: Look for "Share" button
+    const buttons = Array.from(document.querySelectorAll('button'));
+    const shareBtn = buttons.find(btn => btn.innerText.includes('Share') || btn.getAttribute('aria-label') === 'Share chat');
+
+    if (shareBtn && shareBtn.parentElement) {
+      const btn = document.createElement('button');
+      btn.id = 'chatgpt-toc-header-btn';
+      btn.className = shareBtn.className;
+
+      btn.style.display = 'inline-flex';
+      btn.style.alignItems = 'center';
+      btn.style.gap = '8px';
+      btn.style.marginRight = '8px';
+      btn.style.cursor = 'pointer';
+      btn.innerHTML = `<span style="font-size: 16px;">≣</span> TOC`;
+
+      btn.onclick = () => {
+        const container = document.getElementById(SETTINGS.sidebarId);
+        if (container) {
+          const isHidden = container.style.display === 'none' || getComputedStyle(container).display === 'none';
+          container.style.display = isHidden ? 'block' : 'none';
+        }
+      };
+
+      shareBtn.parentElement.insertBefore(btn, shareBtn);
+    }
+  }
+
+  // --- Message Listener (Extension Toggle) ---
+  chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    if (request.action === 'TOGGLE_SIDEBAR') {
+      const container = document.getElementById(SETTINGS.sidebarId);
+      if (container) {
+        const works = container.style.display !== 'none';
+        container.style.display = works ? 'none' : 'block';
+      }
+    }
+  });
+
+  // --- Initialization ---
+
   function init() {
+    // Safety for non-HTML docs (images, svgs, etc)
+    if (document.contentType && document.contentType !== 'text/html') return;
+    if (!document.body) return;
+
     // Initial Render
     refreshTOC();
 
-    // Watch for DOM changes (streaming responses, new messages)
-    // Debounce to avoid excessive re-renders
+    // Watch for DOM changes
     observer = new MutationObserver((mutations) => {
+      injectHeaderButton();
       clearTimeout(debounceTimer);
       debounceTimer = setTimeout(refreshTOC, 2000);
     });
 
-    const targetNode = document.body;
-    observer.observe(targetNode, {
+    observer.observe(document.body, {
       childList: true,
       subtree: true,
       characterData: true,
       attributes: false
     });
 
-    console.log('ChatGPT TOC Extension initialized. Observer & Spy active.');
+    // Retry injection
+    setTimeout(injectHeaderButton, 1500);
+    setTimeout(injectHeaderButton, 4000);
+
+    console.log('ChatGPT TOC Extension initialized.');
   }
 
   // Run slightly delayed to ensure DOM is ready if run_at is document_start

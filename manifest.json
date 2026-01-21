@@ -1,19 +1,30 @@
 {
   "manifest_version": 3,
   "name": "ChatGPT TOC Assistant",
-  "version": "1.0",
+  "version": "1.1",
   "description": "Generates a Table of Contents for ChatGPT conversations.",
   "permissions": [
-    "activeTab"
+    "activeTab",
+    "scripting"
   ],
+  "action": {
+    "default_title": "Toggle Table of Contents"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
   "content_scripts": [
     {
       "matches": [
         "https://chatgpt.com/*",
         "https://chat.openai.com/*"
       ],
-      "js": ["content.js"],
-      "css": ["styles.css"],
+      "js": [
+        "content.js"
+      ],
+      "css": [
+        "styles.css"
+      ],
       "run_at": "document_idle"
     }
   ]
