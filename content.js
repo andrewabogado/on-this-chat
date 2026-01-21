@@ -192,35 +192,22 @@
 
       // Toggle (only if children exist)
       const hasChildren = section.children.length > 0;
-      let toggle = null;
 
-      if (hasChildren) {
-        toggle = document.createElement('span');
-        toggle.className = 'toc-toggle';
-        toggle.innerText = '▼'; // Down arrow
-        toggle.onclick = (e) => {
-          e.stopPropagation();
-          const subList = item.querySelector('.toc-sublist');
-          if (subList) {
-            const isCollapsed = subList.classList.toggle('collapsed');
-            toggle.classList.toggle('collapsed', isCollapsed);
-          }
-        };
-        row.appendChild(toggle);
-      } else {
-        // Spacer for alignment if no children, essentially invisible toggle
-        const spacer = document.createElement('span');
-        spacer.className = 'toc-toggle';
-        spacer.style.cursor = 'default';
-        row.appendChild(spacer);
-      }
+      // No manual toggle button - controlled by click/scroll on parent
 
       const link = document.createElement('span');
       link.className = 'toc-link';
       link.innerText = section.title;
       link.dataset.target = section.id;
-      link.onclick = () => {
+      link.onclick = (e) => {
+        // Scroll to content
         section.element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+        // Use timeout to allow scroll spy to kick in, or manually set active immediately
+        // But for UX, let's manually expand this one and collapse others
+        document.querySelectorAll('.toc-sublist.expanded').forEach(el => el.classList.remove('expanded'));
+        const subList = item.querySelector('.toc-sublist');
+        if (subList) subList.classList.add('expanded');
       };
 
       row.appendChild(link);
@@ -230,15 +217,13 @@
       if (hasChildren) {
         const subList = document.createElement('ul');
         subList.className = 'toc-sublist';
-        // Default execution: Expanded or Collapsed?
-        // User image shows tree. Let's keep expanded by default for discoverability, 
-        // or collapse to keep it clean. Let's start Expanded.
+        // Default: Hidden (via CSS)
+        // No "collapsed" class logic needed if CSS defaults to hidden and we use "expanded"
 
         section.children.forEach(child => {
           const subItem = document.createElement('li');
           subItem.className = 'toc-item sub-header';
 
-          // Sub-item also in a row for potential future nested alignment
           const subRow = document.createElement('div');
           subRow.className = 'toc-item-row';
 
@@ -300,21 +285,33 @@
     if (link) {
       link.classList.add('active');
 
-      // Highlight row background if we want, or just text. Content logic sets class on link.
+      // Expand logic checks
+      // 1. If this is a top-level item (User turn), expand its sublist
+      const parentItem = link.closest('.toc-item.user-message');
+      if (parentItem) {
+        // Collapse all others first? "Only open for when it's parent item is triggered"
+        document.querySelectorAll('.toc-sublist.expanded').forEach(el => {
+          // Don't close if it's THIS item's sublist
+          if (el.parentElement !== parentItem) el.classList.remove('expanded');
+        });
+
+        const subList = parentItem.querySelector('.toc-sublist');
+        if (subList) subList.classList.add('expanded');
+      }
+
+      // 2. If this is a sub-item, ensure its parent sublist is expanded
+      const parentSublist = link.closest('.toc-sublist');
+      if (parentSublist) {
+        parentSublist.classList.add('expanded');
+        // Also ensure other sublists are collapsed? 
+        // If we are deep in a sublist, we implicitly want that one open.
+        document.querySelectorAll('.toc-sublist.expanded').forEach(el => {
+          if (el !== parentSublist) el.classList.remove('expanded');
+        });
+      }
+
       // Auto-scroll sidebar logic:
       link.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-
-      // Auto-expand parent if collapsed
-      const parentSublist = link.closest('.toc-sublist');
-      if (parentSublist && parentSublist.classList.contains('collapsed')) {
-        parentSublist.classList.remove('collapsed');
-        // Also rotate the toggle
-        const parentItem = parentSublist.closest('.toc-item');
-        if (parentItem) {
-          const toggle = parentItem.querySelector('.toc-toggle');
-          if (toggle) toggle.classList.remove('collapsed');
-        }
-      }
     }
   }
 
