@@ -202,12 +202,6 @@
       link.onclick = (e) => {
         // Scroll to content
         section.element.scrollIntoView({ behavior: 'smooth', block: 'start' });
-
-        // Use timeout to allow scroll spy to kick in, or manually set active immediately
-        // But for UX, let's manually expand this one and collapse others
-        document.querySelectorAll('.toc-sublist.expanded').forEach(el => el.classList.remove('expanded'));
-        const subList = item.querySelector('.toc-sublist');
-        if (subList) subList.classList.add('expanded');
       };
 
       row.appendChild(link);
@@ -285,30 +279,7 @@
     if (link) {
       link.classList.add('active');
 
-      // Expand logic checks
-      // 1. If this is a top-level item (User turn), expand its sublist
-      const parentItem = link.closest('.toc-item.user-message');
-      if (parentItem) {
-        // Collapse all others first? "Only open for when it's parent item is triggered"
-        document.querySelectorAll('.toc-sublist.expanded').forEach(el => {
-          // Don't close if it's THIS item's sublist
-          if (el.parentElement !== parentItem) el.classList.remove('expanded');
-        });
-
-        const subList = parentItem.querySelector('.toc-sublist');
-        if (subList) subList.classList.add('expanded');
-      }
-
-      // 2. If this is a sub-item, ensure its parent sublist is expanded
-      const parentSublist = link.closest('.toc-sublist');
-      if (parentSublist) {
-        parentSublist.classList.add('expanded');
-        // Also ensure other sublists are collapsed? 
-        // If we are deep in a sublist, we implicitly want that one open.
-        document.querySelectorAll('.toc-sublist.expanded').forEach(el => {
-          if (el !== parentSublist) el.classList.remove('expanded');
-        });
-      }
+      // Expand logic removed - everything is always visible
 
       // Auto-scroll sidebar logic:
       link.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
