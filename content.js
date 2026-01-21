@@ -114,10 +114,9 @@
     // Immediate UI update
     setActiveLink(id, true); // true = skip scrolling sidebar
 
-    // Calculate position - 100px offset (to clear fixed top areas and enter Observer zone)
-    const y = element.getBoundingClientRect().top + window.scrollY - 100;
-
-    window.scrollTo({ top: y, behavior: 'smooth' });
+    // Use native scrollIntoView for reliability
+    // 'start' aligns it to top.
+    element.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
     // Reset lock after animation
     scrollTimeout = setTimeout(() => {
