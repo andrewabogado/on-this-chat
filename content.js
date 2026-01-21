@@ -242,6 +242,12 @@
     if (structure.length === 0) {
       container.style.display = 'none';
       container.innerHTML = ''; // Clean up
+
+      // Cleanup observer if exists
+      if (container.resizeObserver) {
+        container.resizeObserver.disconnect();
+        container.resizeObserver = null;
+      }
     } else {
       container.style.display = 'block';
 
@@ -252,10 +258,56 @@
 
       container.appendChild(scrollArea);
 
-      // Fade Overlay
-      const fade = document.createElement('div');
-      fade.className = 'toc-fade-overlay';
-      container.appendChild(fade);
+      // Fade Overlays
+      const topFade = document.createElement('div');
+      topFade.className = 'toc-fade-overlay-top';
+      container.appendChild(topFade);
+
+      const bottomFade = document.createElement('div');
+      bottomFade.className = 'toc-fade-overlay';
+      container.appendChild(bottomFade);
+
+      // Cleanup old observer if re-rendering references same container object
+      if (container.resizeObserver) {
+        container.resizeObserver.disconnect();
+      }
+
+      // Smart Logic & Recalibration
+      const updateLayout = () => {
+        const scrollTop = scrollArea.scrollTop;
+        const scrollHeight = scrollArea.scrollHeight;
+        const clientHeight = scrollArea.clientHeight;
+
+        // 1. Position Top Fade (dynamic header height)
+        if (headerDiv) {
+          topFade.style.top = `${headerDiv.offsetHeight}px`;
+        }
+
+        // 2. Top Fade Visibility
+        if (scrollTop > 10) {
+          topFade.classList.add('visible');
+        } else {
+          topFade.classList.remove('visible');
+        }
+
+        // 3. Bottom Fade Visibility
+        if (scrollHeight <= clientHeight || Math.ceil(scrollTop + clientHeight) >= scrollHeight - 1) {
+          bottomFade.classList.add('hidden');
+        } else {
+          bottomFade.classList.remove('hidden');
+        }
+      };
+
+      scrollArea.addEventListener('scroll', updateLayout);
+
+      // Observer for resizes (Recalibrates positions)
+      container.resizeObserver = new ResizeObserver(() => {
+        updateLayout();
+      });
+      container.resizeObserver.observe(container);
+
+      // Init
+      requestAnimationFrame(updateLayout);
     }
   }
 
