@@ -210,8 +210,7 @@
       if (hasChildren) {
         const subList = document.createElement('ul');
         subList.className = 'toc-sublist';
-        // Default: Hidden (via CSS)
-        // No "collapsed" class logic needed if CSS defaults to hidden and we use "expanded"
+        // Always visible via CSS
 
         section.children.forEach(child => {
           const subItem = document.createElement('li');
@@ -245,7 +244,18 @@
       container.innerHTML = ''; // Clean up
     } else {
       container.style.display = 'block';
-      container.appendChild(list);
+
+      // Wrapper for scrolling
+      const scrollArea = document.createElement('div');
+      scrollArea.className = 'toc-scroll-area';
+      scrollArea.appendChild(list);
+
+      container.appendChild(scrollArea);
+
+      // Fade Overlay
+      const fade = document.createElement('div');
+      fade.className = 'toc-fade-overlay';
+      container.appendChild(fade);
     }
   }
 
