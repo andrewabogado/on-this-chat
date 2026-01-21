@@ -46,6 +46,9 @@
         if (title.length > 50) title = title.substring(0, 50) + '...';
         if (!title) title = `User Message ${index + 1}`;
 
+        // Ensure scroll lands with buffer
+        article.style.scrollMarginTop = '80px';
+
         structure.push({
           id: `toc-sec-${index}`,
           title: title,
@@ -88,6 +91,8 @@
             if (!header.id) {
               header.id = `toc-header-${index}-${hIndex}`;
             }
+
+            header.style.scrollMarginTop = '80px';
 
             lastSection.children.push({
               id: header.id,
@@ -335,27 +340,77 @@
 
   // --- Scroll Spy (Active State) ---
 
-  const spyOptions = {
-    root: null,
-    rootMargin: '-10% 0px -80% 0px', // Active zone is near the top
-    threshold: 0
-  };
+  function updateActiveSection() {
+    if (isManualScrolling) return;
 
-  const spyObserver = new IntersectionObserver((entries) => {
-    if (isManualScrolling) return; // Skip updates during manual scroll
+    const scrollY = window.scrollY;
+    // Offset to trigger activation (e.g., 100px from top)
+    const offset = 100;
+    let activeId = null;
 
-    entries.forEach(entry => {
-      if (entry.isIntersecting) {
-        setActiveLink(entry.target.id);
+    // Flatten structure to find candidates
+    const candidates = [];
+    document.querySelectorAll('.toc-link').forEach(link => {
+      const targetId = link.dataset.target;
+      const el = document.getElementById(targetId);
+      if (el) {
+        candidates.push({ id: targetId, top: el.getBoundingClientRect().top + window.scrollY });
       }
     });
-  }, spyOptions);
+
+    // Find the candidate closest to the top but not past the offset point
+    // We want the last candidate whose top value is <= scrollY + offset
+    // Actually, simple logic: Find the first candidate that is *below* the cutoff, and take the one before it.
+
+    // Sort just in case DOM order != visual order (unlikely but safe)
+    // candidates.sort((a, b) => a.top - b.top);
+
+    const cutoff = scrollY + offset;
+
+    // Iterate to find the current section
+    for (let i = 0; i < candidates.length; i++) {
+      if (candidates[i].top <= cutoff) {
+        activeId = candidates[i].id;
+      } else {
+        // This candidate is below our view line, so the previous one (activeId) is the current one.
+        break;
+      }
+    }
+
+    // Default to first if none active (e.g. at very top) but visible?
+    // If activeId is null and we have candidates, maybe activeId = candidates[0].id if near top?
+    // Let's rely on the loop. If scrollY is 0, offset 100. If 1st item top is 150, activeId remains null.
+    // We probably want the first item to be active if we are above it.
+    if (!activeId && candidates.length > 0 && window.scrollY < candidates[0].top) {
+      activeId = candidates[0].id;
+    }
+
+    setActiveLink(activeId, true); // true = skip scrolling sidebar itself to avoid fighting user scroll
+  }
+
+  // Throttle scroll spy
+  let spyTimeout = null;
+  window.addEventListener('scroll', () => {
+    if (spyTimeout) return;
+    spyTimeout = setTimeout(() => {
+      updateActiveSection();
+      spyTimeout = null;
+    }, 100);
+  });
 
   function setActiveLink(targetId, skipScroll = false) {
     if (!targetId) return;
 
+    // Performance optimization: Don't re-do everything if ID hasn't changed.
+    // Can store currentActiveId variable.
+    // But we need to handle the .expanded logic carefully. 
+    // Let's just run it, DOM access is fast enough for 100 elements diff.
+
+    const previousActive = document.querySelector('.toc-link.active');
+    if (previousActive && previousActive.dataset.target === targetId) return;
+
     // Remove current active
-    document.querySelectorAll('.toc-link.active').forEach(el => el.classList.remove('active'));
+    if (previousActive) previousActive.classList.remove('active');
 
     // 1. Find the target link
     const link = document.querySelector(`.toc-link[data-target="${targetId}"]`);
@@ -365,12 +420,15 @@
       // 2. Manage Expansion (Exclusive Accordion)
       const parentItem = link.closest('.toc-item.user-message');
       if (parentItem) {
-        // Collapse all others
-        document.querySelectorAll('.toc-item.user-message.expanded').forEach(el => {
-          if (el !== parentItem) el.classList.remove('expanded');
-        });
-        // Expand current
-        parentItem.classList.add('expanded');
+        // Only re-calc expansion if needed
+        if (!parentItem.classList.contains('expanded')) {
+          // Collapse all others
+          document.querySelectorAll('.toc-item.user-message.expanded').forEach(el => {
+            if (el !== parentItem) el.classList.remove('expanded');
+          });
+          // Expand current
+          parentItem.classList.add('expanded');
+        }
       }
 
       // Auto-scroll sidebar logic:
@@ -386,15 +444,8 @@
   function refreshTOC() {
     const structure = parseConversation();
     renderSidebar(structure);
-
-    // Re-attach spy
-    spyObserver.disconnect();
-    structure.forEach(section => {
-      if (section.element) spyObserver.observe(section.element);
-      section.children.forEach(child => {
-        if (child.element) spyObserver.observe(child.element);
-      });
-    });
+    // Initial active check
+    setTimeout(updateActiveSection, 100);
   }
 
   // --- Initialization ---
