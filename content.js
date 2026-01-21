@@ -120,7 +120,7 @@
     headerDiv.style.justifyContent = 'space-between';
     headerDiv.style.alignItems = 'center';
     headerDiv.style.marginBottom = '12px';
-    headerDiv.style.borderBottom = '1px solid rgba(255, 255, 255, 0.1)';
+    headerDiv.style.borderBottom = '1px solid rgba(0, 0, 0, 0.1)';
     headerDiv.style.paddingBottom = '8px';
 
     const titleEl = document.createElement('h2');
@@ -132,8 +132,8 @@
     refreshBtn.innerText = '↻';
     refreshBtn.title = 'Refresh TOC';
     refreshBtn.style.background = 'transparent';
-    refreshBtn.style.border = '1px solid rgba(255, 255, 255, 0.2)';
-    refreshBtn.style.color = '#fff';
+    refreshBtn.style.border = '1px solid rgba(0, 0, 0, 0.2)';
+    refreshBtn.style.color = '#374151'; // Dark text for light mode
     refreshBtn.style.borderRadius = '4px';
     refreshBtn.style.cursor = 'pointer';
     refreshBtn.style.padding = '2px 8px';
