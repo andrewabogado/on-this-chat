@@ -126,7 +126,7 @@
     headerDiv.style.paddingBottom = '0px';
 
     const titleEl = document.createElement('h2');
-    titleEl.innerText = 'On this page'; // Sentence case
+    titleEl.innerText = 'On This Chat'; // Sentence case
     titleEl.style.margin = '0';
     titleEl.style.border = 'none';
 
