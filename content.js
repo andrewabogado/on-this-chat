@@ -168,7 +168,6 @@
     closeBtn.style.lineHeight = '14px';
     closeBtn.onclick = () => {
       container.style.display = 'none';
-      ensureToggleBtn();
     };
 
     btnContainer.appendChild(refreshBtn);
@@ -242,12 +241,10 @@
 
     // Handle empty state
     if (structure.length === 0) {
-      const empty = document.createElement('div');
-      empty.style.padding = '10px';
-      empty.style.color = '#888';
-      empty.innerText = 'No content structure found yet.';
-      container.appendChild(empty);
+      container.style.display = 'none';
+      container.innerHTML = ''; // Clean up
     } else {
+      container.style.display = 'block';
       container.appendChild(list);
     }
   }
@@ -303,88 +300,6 @@
     });
   }
 
-  function ensureToggleBtn() {
-    let toggle = document.getElementById('chatgpt-toc-toggle');
-    if (!toggle) {
-      toggle = document.createElement('div');
-      toggle.id = 'chatgpt-toc-toggle';
-      toggle.innerText = 'M'; // "Menu" or icon? Let's use '≣' or 'TOC'
-      toggle.innerText = '≣';
-      toggle.style.position = 'fixed';
-      toggle.style.top = '100px';
-      toggle.style.right = '0'; // Hug right edge
-      toggle.style.padding = '10px 14px';
-      toggle.style.background = 'rgba(255, 255, 255, 0.9)';
-      toggle.style.border = '1px solid rgba(0,0,0,0.1)';
-      toggle.style.borderRight = 'none';
-      toggle.style.borderTopLeftRadius = '8px';
-      toggle.style.borderBottomLeftRadius = '8px';
-      toggle.style.cursor = 'pointer';
-      toggle.style.boxShadow = '-2px 2px 5px rgba(0,0,0,0.05)';
-      toggle.style.zIndex = '9998';
-      toggle.style.color = '#333';
-      toggle.style.fontWeight = 'bold';
-      toggle.style.fontSize = '18px';
-      toggle.onclick = () => {
-        const container = document.getElementById(SETTINGS.sidebarId);
-        if (container) {
-          container.style.display = 'block';
-          toggle.style.display = 'none';
-        }
-      };
-      document.body.appendChild(toggle);
-    } else {
-      toggle.style.display = 'block';
-    }
-  }
-
-  // --- Initialization ---
-
-  // --- Header Integration ---
-
-  function injectHeaderButton() {
-    if (!document.body) return;
-    if (document.getElementById('chatgpt-toc-header-btn')) return;
-
-    // Strategy: Look for "Share" button
-    const buttons = Array.from(document.querySelectorAll('button'));
-    const shareBtn = buttons.find(btn => btn.innerText.includes('Share') || btn.getAttribute('aria-label') === 'Share chat');
-
-    if (shareBtn && shareBtn.parentElement) {
-      const btn = document.createElement('button');
-      btn.id = 'chatgpt-toc-header-btn';
-      btn.className = shareBtn.className;
-
-      btn.style.display = 'inline-flex';
-      btn.style.alignItems = 'center';
-      btn.style.gap = '8px';
-      btn.style.marginRight = '8px';
-      btn.style.cursor = 'pointer';
-      btn.innerHTML = `<span style="font-size: 16px;">≣</span> TOC`;
-
-      btn.onclick = () => {
-        const container = document.getElementById(SETTINGS.sidebarId);
-        if (container) {
-          const isHidden = container.style.display === 'none' || getComputedStyle(container).display === 'none';
-          container.style.display = isHidden ? 'block' : 'none';
-        }
-      };
-
-      shareBtn.parentElement.insertBefore(btn, shareBtn);
-    }
-  }
-
-  // --- Message Listener (Extension Toggle) ---
-  chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-    if (request.action === 'TOGGLE_SIDEBAR') {
-      const container = document.getElementById(SETTINGS.sidebarId);
-      if (container) {
-        const works = container.style.display !== 'none';
-        container.style.display = works ? 'none' : 'block';
-      }
-    }
-  });
-
   // --- Initialization ---
 
   function init() {
@@ -397,7 +312,6 @@
 
     // Watch for DOM changes
     observer = new MutationObserver((mutations) => {
-      injectHeaderButton();
       clearTimeout(debounceTimer);
       debounceTimer = setTimeout(refreshTOC, 2000);
     });
@@ -408,10 +322,6 @@
       characterData: true,
       attributes: false
     });
-
-    // Retry injection
-    setTimeout(injectHeaderButton, 1500);
-    setTimeout(injectHeaderButton, 4000);
 
     console.log('ChatGPT TOC Extension initialized.');
   }
