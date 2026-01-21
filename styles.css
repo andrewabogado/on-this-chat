@@ -19,7 +19,7 @@
   border-radius: 8px;
   padding: 12px;
   overflow-y: auto;
-  z-index: 9999;
+  z-index: 10;
 
   /* Font Updates */
   color: #6b7280;
