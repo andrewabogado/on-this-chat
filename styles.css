@@ -101,14 +101,14 @@
 }
 
 .toc-link:hover {
-  color: #111827;
+  color: #000000;
 }
 
 /* Active State Styles */
 .toc-link.active {
-  color: #111827;
-  font-weight: 500;
-  /* Semi-bold for active */
+  color: #000000;
+  font-weight: 400;
+  /* Normal */
 }
 
 /* User Messages (Top Level) */
@@ -117,10 +117,13 @@
   color: #737373;
 }
 
+.toc-item.user-message>.toc-item-row>.toc-link:hover {
+  color: #000000;
+}
+
 .toc-item.user-message>.toc-item-row>.toc-link.active {
-  color: #111827;
-  font-weight: 500;
-  /* Semi-bold like sub-items */
+  color: #000000;
+  font-weight: 400;
 }
 
 /* Assistant Sub-headers (Nested) */
@@ -144,12 +147,12 @@
 }
 
 .toc-item.sub-header>.toc-item-row>.toc-link:hover {
-  color: #111827;
+  color: #000000;
 }
 
 .toc-item.sub-header>.toc-item-row>.toc-link.active {
-  color: #111827;
-  font-weight: 500;
+  color: #000000;
+  font-weight: 400;
 }
 
 /* Scrollbar */
