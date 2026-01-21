@@ -54,6 +54,8 @@
 .toc-list {
   list-style: none;
   padding: 0;
+  padding-left: 16px;
+  /* Space for hanging bullets */
   margin: 0;
 }
 
@@ -126,38 +128,26 @@
   font-weight: 400;
 }
 
-/* Assistant Sub-headers (Nested) */
-.toc-sublist {
-  list-style: none;
-  padding-left: 12px;
-  /* Simple Indentation */
-  margin-top: 1px;
-  border: none;
-  /* No border */
-  display: none;
-  /* Hidden by default */
-}
+/* Expanded State (Keep parent active color) */
+/* Expanded State (Keep parent active color) */
+/* Expanded logic removed for flat list */
 
-.toc-item.user-message.expanded .toc-sublist {
-  display: block;
-}
-
-/* Sub-items */
-.toc-item.sub-header>.toc-item-row>.toc-link {
+/* Follow-up Icon - Hanging bullet style */
+.toc-follow-up-icon {
+  color: #9ca3af;
   font-size: 12px;
-  color: #737373;
-  padding-left: 0;
-  /* Already indented by sublist padding */
+  position: absolute;
+  left: -14px;
+  top: 3px;
 }
 
-.toc-item.sub-header>.toc-item-row>.toc-link:hover {
-  color: #000000;
+/* Position row relatively for the hanging icon */
+.toc-item.follow-up>.toc-item-row {
+  position: relative;
 }
 
-.toc-item.sub-header>.toc-item-row>.toc-link.active {
-  color: #000000;
-  font-weight: 400;
-}
+/* Assistant Sub-headers (Nested) */
+/* Assistant Sub-headers (Nested) - Removed */
 
 /* Scrollbar */
 #chatgpt-toc-sidebar::-webkit-scrollbar {

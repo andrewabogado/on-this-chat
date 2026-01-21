@@ -15,14 +15,16 @@
       userMessage: '[data-message-author-role="user"]',
       assistantMessage: '[data-message-author-role="assistant"]',
       // Headers within assistant response - Limited to H1/H2 per user request
-      headers: 'h1, h2, h3, strong'
+      headers: 'h1, h2'
     }
   };
 
   let observer = null;
+
   let debounceTimer = null;
   let isManualScrolling = false;
   let scrollTimeout = null;
+
 
   // --- Core Logic ---
 
@@ -49,84 +51,71 @@
         // Ensure scroll lands with buffer
         article.style.scrollMarginTop = '80px';
 
+        // Assign ID for scroll spy targeting
+        const sectionId = `toc-sec-${index}`;
+        article.id = sectionId;
+
+        // Check if this is a follow-up/branch message
+        // ChatGPT shows branch navigation arrows (< >) when a message has branches
+        // Look for the branch navigation controls near the user message
+        const hasBranchNav = article.querySelector('[data-testid*="branch"]') !== null ||
+          article.querySelector('button[aria-label*="branch"]') !== null ||
+          article.querySelector('button[aria-label*="previous"]') !== null ||
+          // Check for the "1/2" style branch indicator text
+          article.querySelector('[class*="text-xs"]')?.innerText?.match(/^\d+\/\d+$/) !== null;
+
+        const isFollowUp = hasBranchNav;
+
         structure.push({
-          id: `toc-sec-${index}`,
+          id: sectionId,
           title: title,
           type: 'user',
           element: article,
+          isFollowUp: isFollowUp,
           children: []
         });
 
-      } else if (assistantMsg) {
-        // --- Assistant Turn ---
-        // Attach to the last user message if possible
-        const lastSection = structure[structure.length - 1];
-        if (lastSection) {
-          // Scan for headers within this response to make sub-sections
-          const headers = assistantMsg.querySelectorAll(SETTINGS.selectors.headers);
-          headers.forEach((header, hIndex) => {
-            let hTitle = header.innerText.trim();
-            if (!hTitle) return;
-
-            // --- Heuristic: Filter out noise ---
-            // 1. Length check
-            if (hTitle.length < 2 || hTitle.length > 80) return;
-
-            // 2. Strong tag specific checks
-            if (header.tagName === 'STRONG') {
-              // Start of line check: Ensure strict parent-child structure
-              // If the strong tag is buried in text (e.g. "This is **important**"), ignore it.
-              // We check if the parent element's text starts with this strong tag's text.
-              const parentText = header.parentElement.innerText.trim();
-              if (!parentText.startsWith(hTitle)) return;
-
-              // Also eliminate very short labels like "Note:" or "Warning:" unless user wants them?
-              // Usually headers are substantial.
-            }
-
-            // Truncate for display
-            if (hTitle.length > 60) hTitle = hTitle.substring(0, 60) + '...';
-
-            // Give it an ID if it doesn't have one, so we can scroll to it
-            if (!header.id) {
-              header.id = `toc-header-${index}-${hIndex}`;
-            }
-
-            header.style.scrollMarginTop = '80px';
-
-            lastSection.children.push({
-              id: header.id,
-              title: hTitle,
-              type: 'header',
-              element: header
-            });
-          });
-        }
       }
+      // else if (assistantMsg) { ... } -> Removed per simplification request.
+      // We only want top-level User Messages.
     });
 
     return structure;
   }
 
   /**
-   * Helper to perform offset scrolling
+   * Helper to perform offset scrolling with retry for lazy-loaded content
    */
-  function scrollToElement(element, id) {
+  function scrollToElement(element, id, retryCount = 0) {
     if (!element) return;
+
     isManualScrolling = true;
     clearTimeout(scrollTimeout);
 
     // Immediate UI update
-    setActiveLink(id, true); // true = skip scrolling sidebar
+    setActiveLink(id, true);
 
-    // Use native scrollIntoView for reliability
-    // 'start' aligns it to top.
+    // Use native scrollIntoView
     element.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
-    // Reset lock after animation
+    // After scroll completes, verify element position and retry if needed
+    // This handles lazy-loaded content that may shift after initial scroll
     scrollTimeout = setTimeout(() => {
-      isManualScrolling = false;
-    }, 1000);
+      const rect = element.getBoundingClientRect();
+      const expectedTop = 80; // scrollMarginTop value
+      const tolerance = 50;
+
+      // If element is not near expected position and we haven't retried too many times
+      if (Math.abs(rect.top - expectedTop) > tolerance && retryCount < 2) {
+        // Content may have lazy-loaded, try again
+        element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        scrollTimeout = setTimeout(() => {
+          isManualScrolling = false;
+        }, 500);
+      } else {
+        isManualScrolling = false;
+      }
+    }, 600);
   }
 
   /**
@@ -154,55 +143,12 @@
     headerDiv.style.paddingBottom = '0px';
 
     const titleEl = document.createElement('h2');
-    titleEl.innerText = 'On This Chat'; // Sentence case
+    titleEl.innerText = 'On This Chat';
     titleEl.style.margin = '0';
     titleEl.style.border = 'none';
-
-    // --- Buttons Container ---
-    const btnContainer = document.createElement('div');
-    btnContainer.style.display = 'flex';
-    btnContainer.style.gap = '4px'; // Closer gap
-
-    // Refresh Button
-    const refreshBtn = document.createElement('button');
-    refreshBtn.innerText = '↻';
-    refreshBtn.title = 'Refresh TOC';
-    refreshBtn.style.background = 'transparent';
-    refreshBtn.style.border = 'none'; // Removed border
-    refreshBtn.style.color = '#737373'; // Match header color
-    refreshBtn.style.borderRadius = '4px';
-    refreshBtn.style.cursor = 'pointer';
-    refreshBtn.style.padding = '2px 6px';
-    refreshBtn.style.fontSize = '14px';
-    refreshBtn.onclick = () => {
-      refreshBtn.innerText = '...';
-      setTimeout(() => {
-        refreshTOC();
-        refreshBtn.innerText = '↻';
-      }, 100);
-    };
-
-    // Close Button
-    const closeBtn = document.createElement('button');
-    closeBtn.innerText = '×';
-    closeBtn.title = 'Close TOC';
-    closeBtn.style.background = 'transparent';
-    closeBtn.style.border = 'none'; // Removed border
-    closeBtn.style.color = '#737373';
-    closeBtn.style.borderRadius = '4px';
-    closeBtn.style.cursor = 'pointer';
-    closeBtn.style.padding = '2px 6px';
-    closeBtn.style.fontSize = '18px'; // Slightly larger for X check
-    closeBtn.style.lineHeight = '14px';
-    closeBtn.onclick = () => {
-      container.style.display = 'none';
-    };
-
-    btnContainer.appendChild(refreshBtn);
-    btnContainer.appendChild(closeBtn);
+    titleEl.style.paddingLeft = '14px';
 
     headerDiv.appendChild(titleEl);
-    headerDiv.appendChild(btnContainer);
     container.appendChild(headerDiv);
 
     // 3. Build List
@@ -213,19 +159,20 @@
       // User Item
       const item = document.createElement('li');
       item.className = 'toc-item user-message';
-
-      // Restore expansion state
-      if (restoredState.expandedId && section.id === restoredState.expandedId) {
-        item.classList.add('expanded');
+      if (section.isFollowUp) {
+        item.classList.add('follow-up');
       }
 
       const row = document.createElement('div');
       row.className = 'toc-item-row';
 
-      // Toggle (only if children exist)
-      const hasChildren = section.children.length > 0;
-
-      // No manual toggle button - controlled by click/scroll on parent
+      // Add follow-up arrow icon if applicable
+      if (section.isFollowUp) {
+        const arrow = document.createElement('span');
+        arrow.className = 'toc-follow-up-icon';
+        arrow.innerText = '↳';
+        row.appendChild(arrow);
+      }
 
       const link = document.createElement('span');
       link.className = 'toc-link';
@@ -237,35 +184,6 @@
 
       row.appendChild(link);
       item.appendChild(row);
-
-      // Sub-items (Assistant Headers)
-      if (hasChildren) {
-        const subList = document.createElement('ul');
-        subList.className = 'toc-sublist';
-        // Always visible via CSS
-
-        section.children.forEach(child => {
-          const subItem = document.createElement('li');
-          subItem.className = 'toc-item sub-header';
-
-          const subRow = document.createElement('div');
-          subRow.className = 'toc-item-row';
-
-          const subLink = document.createElement('span');
-          subLink.className = 'toc-link';
-          subLink.innerText = child.title;
-          subLink.dataset.target = child.id;
-          subLink.onclick = (e) => {
-            e.stopPropagation();
-            scrollToElement(child.element, child.id);
-          };
-
-          subRow.appendChild(subLink);
-          subItem.appendChild(subRow);
-          subList.appendChild(subItem);
-        });
-        item.appendChild(subList);
-      }
 
       list.appendChild(item);
     });
@@ -348,66 +266,62 @@
     }
   }
 
+
   // --- Scroll Spy (Active State) ---
 
   function updateActiveSection() {
     if (isManualScrolling) return;
 
-    const scrollY = window.scrollY;
-    // active state if its top is roughly in the top 20% of the viewport.
-    const offset = window.innerHeight * 0.2;
+    const targetPosition = 80;
     let activeId = null;
+    let closestDistance = Infinity;
 
-    // Flatten structure to find candidates
-    const candidates = [];
-    document.querySelectorAll('.toc-link').forEach(link => {
+    const links = document.querySelectorAll('.toc-link');
+    const currentActive = document.querySelector('.toc-link.active');
+    const currentActiveId = currentActive ? currentActive.dataset.target : null;
+
+    links.forEach(link => {
       const targetId = link.dataset.target;
       const el = document.getElementById(targetId);
       if (el) {
-        candidates.push({ id: targetId, top: el.getBoundingClientRect().top + window.scrollY });
+        const rect = el.getBoundingClientRect();
+
+        // Priority check: if this is the currently active item, give it a "bonus" to stay active
+        // unless another item is significantly closer to the target position.
+        let distance = Math.abs(rect.top - targetPosition);
+        if (targetId === currentActiveId) {
+          distance -= 20; // 20px "stickiness" bonus
+        }
+
+        if (rect.top <= window.innerHeight / 2) {
+          if (distance < closestDistance) {
+            closestDistance = distance;
+            activeId = targetId;
+          }
+        }
       }
     });
 
-    // Find the candidate closest to the top but not past the offset point
-    // We want the last candidate whose top value is <= scrollY + offset
-    // Actually, simple logic: Find the first candidate that is *below* the cutoff, and take the one before it.
-
-    // Sort just in case DOM order != visual order (unlikely but safe)
-    // candidates.sort((a, b) => a.top - b.top);
-
-    const cutoff = scrollY + offset;
-
-    // Iterate to find the current section
-    for (let i = 0; i < candidates.length; i++) {
-      if (candidates[i].top <= cutoff) {
-        activeId = candidates[i].id;
-      } else {
-        // This candidate is below our view line, so the previous one (activeId) is the current one.
-        break;
-      }
+    // Fallback to first item
+    if (!activeId && links.length > 0) {
+      activeId = links[0].dataset.target;
     }
 
-    // Default to first if none active (e.g. at very top) but visible?
-    // If activeId is null and we have candidates, maybe activeId = candidates[0].id if near top?
-    // Let's rely on the loop. If scrollY is 0, offset 100. If 1st item top is 150, activeId remains null.
-    // We probably want the first item to be active if we are above it.
-    if (!activeId && candidates.length > 0 && window.scrollY < candidates[0].top) {
-      activeId = candidates[0].id;
-    }
-
-    setActiveLink(activeId, true); // true = skip scrolling sidebar itself to avoid fighting user scroll
+    setActiveLink(activeId, true);
   }
 
-  // Throttle scroll spy
+  // Throttle scroll spy with stability check to reduce flickering
   let spyTimeout = null;
+  let lastActiveId = null;
+  let stabilityCount = 0;
+
   window.addEventListener('scroll', () => {
     if (spyTimeout) return;
     spyTimeout = setTimeout(() => {
       updateActiveSection();
       spyTimeout = null;
-    }, 100);
+    }, 200); // Increased to 200ms for more stability
   });
-
   function setActiveLink(targetId, skipScroll = false) {
     if (!targetId) return;
 
@@ -427,19 +341,7 @@
     if (link) {
       link.classList.add('active');
 
-      // 2. Manage Expansion (Exclusive Accordion)
-      const parentItem = link.closest('.toc-item.user-message');
-      if (parentItem) {
-        // Only re-calc expansion if needed
-        if (!parentItem.classList.contains('expanded')) {
-          // Collapse all others
-          document.querySelectorAll('.toc-item.user-message.expanded').forEach(el => {
-            if (el !== parentItem) el.classList.remove('expanded');
-          });
-          // Expand current
-          parentItem.classList.add('expanded');
-        }
-      }
+      // 2. Manage Active State (Simple)
 
       // Auto-scroll sidebar logic:
       if (!skipScroll) {
@@ -456,17 +358,15 @@
     const scrollArea = document.querySelector('.toc-scroll-area');
     const scrollTop = scrollArea ? scrollArea.scrollTop : 0;
 
-    let expandedId = null;
-    const expandedParent = document.querySelector('.toc-item.user-message.expanded');
-    if (expandedParent) {
-      const parentLink = expandedParent.querySelector('.toc-link');
-      if (parentLink) expandedId = parentLink.dataset.target;
-    }
+    const expandedId = null; // No longer needed
+    // const expandedParent = ... removed
 
     const structure = parseConversation();
-    renderSidebar(structure, { expandedId, scrollTop });
+    renderSidebar(structure, { scrollTop });
+
     // Initial active check
     setTimeout(updateActiveSection, 100);
+
   }
 
   // --- Initialization ---
