@@ -15,7 +15,7 @@
       userMessage: '[data-message-author-role="user"]',
       assistantMessage: '[data-message-author-role="assistant"]',
       // Headers within assistant response - Limited to H1/H2 per user request
-      headers: 'h1, h2'
+      headers: 'h1, h2, h3, strong'
     }
   };
 
@@ -70,7 +70,7 @@
 
             // --- Heuristic: Filter out noise ---
             // 1. Length check
-            if (hTitle.length < 2 || hTitle.length > 60) return;
+            if (hTitle.length < 2 || hTitle.length > 80) return;
 
             // 2. Strong tag specific checks
             if (header.tagName === 'STRONG') {
@@ -85,7 +85,7 @@
             }
 
             // Truncate for display
-            if (hTitle.length > 40) hTitle = hTitle.substring(0, 40) + '...';
+            if (hTitle.length > 60) hTitle = hTitle.substring(0, 60) + '...';
 
             // Give it an ID if it doesn't have one, so we can scroll to it
             if (!header.id) {
@@ -482,7 +482,7 @@
     // Watch for DOM changes
     observer = new MutationObserver((mutations) => {
       clearTimeout(debounceTimer);
-      debounceTimer = setTimeout(refreshTOC, 2000);
+      debounceTimer = setTimeout(refreshTOC, 1000);
     });
 
     observer.observe(document.body, {
