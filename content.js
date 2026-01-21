@@ -14,8 +14,8 @@
       messageBlock: 'article',
       userMessage: '[data-message-author-role="user"]',
       assistantMessage: '[data-message-author-role="assistant"]',
-      // Headers within assistant response
-      headers: 'h1, h2, h3, h4, h5, h6, strong'
+      // Headers within assistant response - Limited to H1/H2 per user request
+      headers: 'h1, h2'
     }
   };
 
