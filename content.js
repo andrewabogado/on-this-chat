@@ -133,7 +133,7 @@
    * Renders the Sidebar HTML based on the parsed structure.
    * @param {Array} structure 
    */
-  function renderSidebar(structure) {
+  function renderSidebar(structure, restoredState = {}) {
     if (!document.body) return; // Safety check
 
     // 1. Create or Clear Container
@@ -214,6 +214,11 @@
       const item = document.createElement('li');
       item.className = 'toc-item user-message';
 
+      // Restore expansion state
+      if (restoredState.expandedId && section.id === restoredState.expandedId) {
+        item.classList.add('expanded');
+      }
+
       const row = document.createElement('div');
       row.className = 'toc-item-row';
 
@@ -284,6 +289,11 @@
       scrollArea.appendChild(list);
 
       container.appendChild(scrollArea);
+
+      // Restore scroll position
+      if (restoredState.scrollTop) {
+        scrollArea.scrollTop = restoredState.scrollTop;
+      }
 
       // Fade Overlays
       const topFade = document.createElement('div');
@@ -442,8 +452,19 @@
    * Main refresh function.
    */
   function refreshTOC() {
+    // Capture state to persist across re-renders
+    const scrollArea = document.querySelector('.toc-scroll-area');
+    const scrollTop = scrollArea ? scrollArea.scrollTop : 0;
+
+    let expandedId = null;
+    const expandedParent = document.querySelector('.toc-item.user-message.expanded');
+    if (expandedParent) {
+      const parentLink = expandedParent.querySelector('.toc-link');
+      if (parentLink) expandedId = parentLink.dataset.target;
+    }
+
     const structure = parseConversation();
-    renderSidebar(structure);
+    renderSidebar(structure, { expandedId, scrollTop });
     // Initial active check
     setTimeout(updateActiveSection, 100);
   }
