@@ -208,7 +208,32 @@
   }
 
   /**
+   * Forces a recalculation of the document/container height
+   * This helps account for lazy-loaded content that may have changed the layout
+   */
+  function recalculateContainerHeight() {
+    // Force a layout recalculation by accessing layout properties
+    // This ensures any lazy-loaded content is included in height calculations
+    const body = document.body;
+    const html = document.documentElement;
+    
+    // Access properties that trigger layout recalculation
+    void body.offsetHeight;
+    void html.offsetHeight;
+    void body.scrollHeight;
+    void html.scrollHeight;
+    
+    // Also check for any scroll containers that might have changed
+    const scrollContainers = document.querySelectorAll('[style*="overflow"], [class*="overflow"]');
+    scrollContainers.forEach(container => {
+      void container.scrollHeight;
+      void container.offsetHeight;
+    });
+  }
+
+  /**
    * Helper to perform offset scrolling with retry for lazy-loaded content
+   * Always recalculates container height to account for newly loaded content
    */
   function scrollToElement(element, id, retryCount = 0) {
     if (!element) return;
@@ -219,8 +244,11 @@
     // Immediate UI update
     setActiveLink(id, true);
 
-    // First, bring element into viewport (even if not fully loaded)
-    // This triggers lazy loading
+    // Step 1: Force recalculation of container height BEFORE scrolling
+    // This ensures we account for any content that was loaded since last calculation
+    recalculateContainerHeight();
+
+    // Step 2: Bring element into viewport to trigger lazy loading if needed
     const initialRect = element.getBoundingClientRect();
     const isInViewport = initialRect.top < window.innerHeight && initialRect.bottom > 0;
     
@@ -230,13 +258,16 @@
       element.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
 
-    // Wait for element to be loaded and content to stabilize
+    // Step 3: Wait for element to be loaded and content to stabilize
     waitForElementLoad(element, 2000).then((isLoaded) => {
-      // Give a bit more time for content to fully render after loading
+      // Step 4: After content loads, recalculate container height again
+      // This accounts for any content that loaded during the wait
       setTimeout(() => {
-        // Calculate the exact scroll position to place element at top
-        const expectedTop = 80; // scrollMarginTop value
+        recalculateContainerHeight();
+        
+        // Step 5: Get fresh measurements after height recalculation
         const rect = element.getBoundingClientRect();
+        const expectedTop = 80; // scrollMarginTop value
         const currentTop = rect.top;
         const scrollY = window.scrollY || window.pageYOffset;
         
@@ -245,23 +276,29 @@
         const adjustment = currentTop - expectedTop;
         const targetScroll = scrollY + adjustment;
 
-        // Scroll to position the element at the top (not center)
+        // Step 6: Scroll to position the element at the top (not center)
         window.scrollTo({
           top: targetScroll,
           behavior: 'smooth'
         });
 
-        // After scroll completes, verify and fine-tune if needed
+        // Step 7: After scroll completes, recalculate height one more time and verify
         scrollTimeout = setTimeout(() => {
+          // Recalculate height again in case more content loaded during scroll
+          recalculateContainerHeight();
+          
           const finalRect = element.getBoundingClientRect();
           const finalTop = finalRect.top;
           const tolerance = 20; // Tighter tolerance for final check
 
           // Verify the top of the element is at expectedTop
           if (Math.abs(finalTop - expectedTop) > tolerance) {
-            // Fine-tune: adjust scroll to place top of element exactly at expectedTop
+            // Fine-tune: recalculate with fresh measurements
+            recalculateContainerHeight();
+            const freshRect = element.getBoundingClientRect();
+            const freshTop = freshRect.top;
             const finalScrollY = window.scrollY || window.pageYOffset;
-            const finalAdjustment = finalTop - expectedTop;
+            const finalAdjustment = freshTop - expectedTop;
             const preciseScroll = finalScrollY + finalAdjustment;
             
             // Final precise scroll without animation to position at top
@@ -278,7 +315,7 @@
             isManualScrolling = false;
           }
         }, 600); // Wait for smooth scroll animation
-      }, isLoaded ? 100 : 300); // Wait longer if element wasn't fully loaded
+      }, isLoaded ? 200 : 400); // Wait longer to ensure content is fully loaded
     });
   }
 
