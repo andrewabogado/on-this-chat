@@ -277,9 +277,15 @@
 
       container.appendChild(scrollArea);
 
-      // Restore scroll position
-      if (restoredState.scrollTop) {
+      // Restore scroll position or scroll to bottom on initial load
+      if (restoredState.scrollTop !== undefined && restoredState.scrollTop !== null) {
         scrollArea.scrollTop = restoredState.scrollTop;
+      } else if (isInitialLoad) {
+        // On initial load, scroll to bottom to show the last items
+        // Use setTimeout to ensure DOM is fully rendered
+        setTimeout(() => {
+          scrollArea.scrollTop = scrollArea.scrollHeight;
+        }, 100);
       }
 
       // Fade Overlays - append after scrollArea so they're on top
@@ -318,12 +324,13 @@
           topFade.classList.remove('visible');
         }
 
-        // 3. Bottom Fade Visibility - hide when at bottom
+        // 3. Bottom Fade Visibility - show when there's more content below
         const isAtBottom = scrollHeight <= clientHeight || 
                           Math.ceil(scrollTop + clientHeight) >= scrollHeight - 5;
         if (isAtBottom) {
           bottomFade.classList.add('hidden');
         } else {
+          // Show bottom fade if there's scrollable content
           bottomFade.classList.remove('hidden');
         }
       };
@@ -345,8 +352,26 @@
       });
       container.resizeObserver.observe(container);
 
-      // Init
-      requestAnimationFrame(updateLayout);
+      // Init layout and fade overlays
+      requestAnimationFrame(() => {
+        updateLayout();
+        // After layout update, check if we need to scroll to bottom on initial load
+        if (isInitialLoad && restoredState.scrollTop === null) {
+          setTimeout(() => {
+            const maxScroll = scrollArea.scrollHeight - scrollArea.clientHeight;
+            if (maxScroll > 0) {
+              scrollArea.scrollTop = maxScroll;
+              // Update layout again after scrolling to show correct fade overlays
+              setTimeout(() => {
+                updateLayout();
+              }, 100);
+            } else {
+              // Even if no scroll needed, update layout to ensure fade overlays are correct
+              updateLayout();
+            }
+          }, 200);
+        }
+      });
       
       // Update active section after rendering
       setTimeout(() => {
@@ -534,28 +559,64 @@
       // Auto-scroll sidebar logic: Scroll the TOC scroll area to keep active link visible
       if (!skipScroll && !isManualTOCScrolling) {
         const scrollArea = document.querySelector('.toc-scroll-area');
-        if (scrollArea) {
+        if (scrollArea && link) {
+          // Use getBoundingClientRect for accurate positioning
           const linkRect = link.getBoundingClientRect();
           const scrollAreaRect = scrollArea.getBoundingClientRect();
           
-          // Check if link is outside the visible area
-          const isAbove = linkRect.top < scrollAreaRect.top;
-          const isBelow = linkRect.bottom > scrollAreaRect.bottom;
+          // Calculate link position relative to scroll area viewport
+          const linkTopRelative = linkRect.top - scrollAreaRect.top + scrollArea.scrollTop;
+          const linkBottomRelative = linkRect.bottom - scrollAreaRect.top + scrollArea.scrollTop;
           
-          if (isAbove || isBelow) {
-            // Calculate the scroll position needed to center the link (or at least make it visible)
-            const linkOffsetTop = link.offsetTop;
-            const scrollAreaHeight = scrollArea.clientHeight;
-            const linkHeight = link.offsetHeight;
+          // Get scroll area dimensions
+          const scrollAreaTop = scrollArea.scrollTop;
+          const scrollAreaHeight = scrollArea.clientHeight;
+          const linkHeight = linkRect.height;
+          
+          // Check if link is visible in scroll area with some margin
+          const margin = 10; // Small margin for "close enough"
+          const isAbove = linkBottomRelative < scrollAreaTop - margin;
+          const isBelow = linkTopRelative > scrollAreaTop + scrollAreaHeight + margin;
+          const isFullyVisible = linkTopRelative >= scrollAreaTop - margin && 
+                                linkBottomRelative <= scrollAreaTop + scrollAreaHeight + margin;
+          
+          // Always try to keep the active link visible and well-positioned
+          // Use a more aggressive approach: center it if it's not well-positioned
+          const padding = 40; // Padding from edges for better visibility
+          let targetScroll;
+          
+          if (isAbove) {
+            // Link is above visible area - scroll to show it at top with padding
+            targetScroll = linkTopRelative - padding;
+          } else if (isBelow) {
+            // Link is below visible area - scroll to show it at bottom with padding
+            targetScroll = linkBottomRelative - scrollAreaHeight + padding;
+          } else if (!isFullyVisible) {
+            // Link is partially visible but not well-positioned - center it
+            targetScroll = linkTopRelative - (scrollAreaHeight / 2) + (linkHeight / 2);
+          } else {
+            // Link is visible, but check if it's too close to edges
+            const distanceFromTop = linkTopRelative - scrollAreaTop;
+            const distanceFromBottom = (scrollAreaTop + scrollAreaHeight) - linkBottomRelative;
             
-            // Center the link in the scroll area
-            const targetScroll = linkOffsetTop - (scrollAreaHeight / 2) + (linkHeight / 2);
-            
-            scrollArea.scrollTo({
-              top: Math.max(0, targetScroll),
-              behavior: 'smooth'
-            });
+            // If too close to top or bottom, center it
+            if (distanceFromTop < padding || distanceFromBottom < padding) {
+              targetScroll = linkTopRelative - (scrollAreaHeight / 2) + (linkHeight / 2);
+            } else {
+              // Link is well-positioned, no need to scroll
+              return;
+            }
           }
+          
+          // Ensure we don't scroll beyond bounds
+          const maxScroll = Math.max(0, scrollArea.scrollHeight - scrollAreaHeight);
+          targetScroll = Math.max(0, Math.min(targetScroll, maxScroll));
+          
+          // Scroll to target position
+          scrollArea.scrollTo({
+            top: targetScroll,
+            behavior: 'smooth'
+          });
         }
       }
     }
@@ -565,6 +626,7 @@
   let lastKnownArticleCount = 0;
   let scrollHeightCheckInterval = null;
   let isScanningForArticles = false;
+  let isInitialLoad = true;
 
   /**
    * Attempts to trigger lazy loading by scrolling through the page incrementally
@@ -657,7 +719,8 @@
   function refreshTOC() {
     // Capture state to persist across re-renders
     const scrollArea = document.querySelector('.toc-scroll-area');
-    const scrollTop = scrollArea ? scrollArea.scrollTop : 0;
+    // On initial load, don't restore scroll position - let it scroll to bottom
+    const scrollTop = (scrollArea && !isInitialLoad) ? scrollArea.scrollTop : null;
 
     // Update known scroll height
     const currentScrollHeight = Math.max(
@@ -675,12 +738,12 @@
       scanForAllArticles(() => {
         const newStructure = parseConversation();
         if (newStructure.length > structure.length) {
-          const newScrollArea = document.querySelector('.toc-scroll-area');
-          const newScrollTop = newScrollArea ? newScrollArea.scrollTop : scrollTop;
+          // On initial load, scroll to bottom; otherwise preserve scroll position
+          const newScrollTop = isInitialLoad ? null : (scrollTop !== null ? scrollTop : undefined);
           renderSidebar(newStructure, { scrollTop: newScrollTop });
           setTimeout(updateActiveSection, 100);
         } else {
-          renderSidebar(structure, { scrollTop });
+          renderSidebar(structure, { scrollTop: scrollTop !== null ? scrollTop : undefined });
           setTimeout(updateActiveSection, 100);
         }
         lastKnownArticleCount = Math.max(structure.length, newStructure.length);
@@ -714,8 +777,15 @@
     setTimeout(() => {
       scanForAllArticles(() => {
         refreshTOC();
+        // Mark initial load as complete after first scan
+        isInitialLoad = false;
       });
     }, 1500);
+    
+    // Mark initial load as complete after a delay (in case scan doesn't run)
+    setTimeout(() => {
+      isInitialLoad = false;
+    }, 3000);
 
     // Watch for DOM changes
     observer = new MutationObserver((mutations) => {
