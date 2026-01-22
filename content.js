@@ -153,6 +153,61 @@
   }
 
   /**
+   * Checks if an element is likely fully loaded by checking its dimensions and content
+   */
+  function isElementLoaded(element) {
+    if (!element) return false;
+    
+    const rect = element.getBoundingClientRect();
+    // Element should have some height (at least 10px) to be considered loaded
+    if (rect.height < 10) return false;
+    
+    // Check if element has visible content
+    const userMsg = element.querySelector('[data-message-author-role="user"]');
+    if (userMsg) {
+      const userRect = userMsg.getBoundingClientRect();
+      if (userRect.height < 5) return false;
+    }
+    
+    return true;
+  }
+
+  /**
+   * Waits for an element to be loaded/visible before scrolling
+   */
+  function waitForElementLoad(element, timeout = 2000) {
+    return new Promise((resolve) => {
+      if (isElementLoaded(element)) {
+        resolve(true);
+        return;
+      }
+
+      // Use IntersectionObserver to detect when element becomes visible
+      const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting && isElementLoaded(element)) {
+            observer.disconnect();
+            clearTimeout(timeoutId);
+            resolve(true);
+          }
+        });
+      }, {
+        root: null,
+        rootMargin: '200px', // Check a bit outside viewport
+        threshold: 0.1
+      });
+
+      observer.observe(element);
+
+      // Timeout fallback
+      const timeoutId = setTimeout(() => {
+        observer.disconnect();
+        resolve(isElementLoaded(element)); // Return current state even if not fully loaded
+      }, timeout);
+    });
+  }
+
+  /**
    * Helper to perform offset scrolling with retry for lazy-loaded content
    */
   function scrollToElement(element, id, retryCount = 0) {
@@ -164,27 +219,63 @@
     // Immediate UI update
     setActiveLink(id, true);
 
-    // Use native scrollIntoView
-    element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    // First, bring element into viewport (even if not fully loaded)
+    // This triggers lazy loading
+    const initialRect = element.getBoundingClientRect();
+    const isInViewport = initialRect.top < window.innerHeight && initialRect.bottom > 0;
+    
+    if (!isInViewport) {
+      // Element not in viewport, scroll it into view first to trigger loading
+      element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
 
-    // After scroll completes, verify element position and retry if needed
-    // This handles lazy-loaded content that may shift after initial scroll
-    scrollTimeout = setTimeout(() => {
-      const rect = element.getBoundingClientRect();
-      const expectedTop = 80; // scrollMarginTop value
-      const tolerance = 50;
+    // Wait for element to be loaded and content to stabilize
+    waitForElementLoad(element, 2000).then((isLoaded) => {
+      // Give a bit more time for content to fully render after loading
+      setTimeout(() => {
+        // Now calculate the exact scroll position
+        const rect = element.getBoundingClientRect();
+        const expectedTop = 80; // scrollMarginTop value
+        const currentTop = rect.top;
+        const scrollY = window.scrollY || window.pageYOffset;
+        
+        // Calculate the target scroll position
+        const adjustment = currentTop - expectedTop;
+        const targetScroll = scrollY + adjustment;
 
-      // If element is not near expected position and we haven't retried too many times
-      if (Math.abs(rect.top - expectedTop) > tolerance && retryCount < 2) {
-        // Content may have lazy-loaded, try again
-        element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        // Scroll to the exact position
+        window.scrollTo({
+          top: targetScroll,
+          behavior: 'smooth'
+        });
+
+        // After scroll completes, verify and fine-tune if needed
         scrollTimeout = setTimeout(() => {
-          isManualScrolling = false;
-        }, 500);
-      } else {
-        isManualScrolling = false;
-      }
-    }, 600);
+          const finalRect = element.getBoundingClientRect();
+          const finalTop = finalRect.top;
+          const tolerance = 20; // Tighter tolerance for final check
+
+          // If still not at exact position, do a final precise adjustment
+          if (Math.abs(finalTop - expectedTop) > tolerance) {
+            const finalScrollY = window.scrollY || window.pageYOffset;
+            const finalAdjustment = finalTop - expectedTop;
+            const preciseScroll = finalScrollY + finalAdjustment;
+            
+            // Final precise scroll without animation
+            window.scrollTo({
+              top: preciseScroll,
+              behavior: 'auto'
+            });
+            
+            scrollTimeout = setTimeout(() => {
+              isManualScrolling = false;
+            }, 50);
+          } else {
+            isManualScrolling = false;
+          }
+        }, 600); // Wait for smooth scroll animation
+      }, isLoaded ? 100 : 300); // Wait longer if element wasn't fully loaded
+    });
   }
 
   /**
