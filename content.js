@@ -282,7 +282,7 @@
         scrollArea.scrollTop = restoredState.scrollTop;
       }
 
-      // Fade Overlays
+      // Fade Overlays - append after scrollArea so they're on top
       const topFade = document.createElement('div');
       topFade.className = 'toc-fade-overlay-top';
       container.appendChild(topFade);
@@ -302,20 +302,26 @@
         const scrollHeight = scrollArea.scrollHeight;
         const clientHeight = scrollArea.clientHeight;
 
-        // 1. Position Top Fade (dynamic header height)
+        // 1. Position Top Fade (dynamic header height + padding)
         if (headerDiv) {
-          topFade.style.top = `${headerDiv.offsetHeight}px`;
+          const headerHeight = headerDiv.offsetHeight;
+          const containerPadding = 12; // Match padding from CSS
+          topFade.style.top = `${headerHeight + containerPadding}px`;
+        } else {
+          topFade.style.top = '12px'; // Fallback to just padding
         }
 
-        // 2. Top Fade Visibility
-        if (scrollTop > 10) {
+        // 2. Top Fade Visibility - show when scrolled down
+        if (scrollTop > 5) {
           topFade.classList.add('visible');
         } else {
           topFade.classList.remove('visible');
         }
 
-        // 3. Bottom Fade Visibility
-        if (scrollHeight <= clientHeight || Math.ceil(scrollTop + clientHeight) >= scrollHeight - 1) {
+        // 3. Bottom Fade Visibility - hide when at bottom
+        const isAtBottom = scrollHeight <= clientHeight || 
+                          Math.ceil(scrollTop + clientHeight) >= scrollHeight - 5;
+        if (isAtBottom) {
           bottomFade.classList.add('hidden');
         } else {
           bottomFade.classList.remove('hidden');
