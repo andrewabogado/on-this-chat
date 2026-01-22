@@ -409,16 +409,41 @@
 
       container.appendChild(scrollArea);
 
-      // Restore scroll position or scroll to bottom on initial load
-      if (restoredState.scrollTop !== undefined && restoredState.scrollTop !== null) {
-        scrollArea.scrollTop = restoredState.scrollTop;
-      } else if (isInitialLoad) {
-        // On initial load, scroll to bottom to show the last items
-        // Use setTimeout to ensure DOM is fully rendered
-        setTimeout(() => {
-          scrollArea.scrollTop = scrollArea.scrollHeight;
-        }, 100);
-      }
+      // Ensure scroll area can properly scroll by forcing a layout recalculation
+      // This helps ensure all items are accounted for in scrollHeight
+      requestAnimationFrame(() => {
+        // Force layout recalculation
+        void scrollArea.offsetHeight;
+        void scrollArea.scrollHeight;
+        void list.offsetHeight;
+        void list.scrollHeight;
+        
+        // Restore scroll position or scroll to bottom on initial load
+        if (restoredState.scrollTop !== undefined && restoredState.scrollTop !== null) {
+          scrollArea.scrollTop = restoredState.scrollTop;
+        } else if (isInitialLoad) {
+          // On initial load, scroll to bottom to show the last items
+          // Use multiple attempts to ensure we get to the actual bottom
+          const scrollToBottom = () => {
+            const maxScroll = scrollArea.scrollHeight - scrollArea.clientHeight;
+            if (maxScroll > 0) {
+              scrollArea.scrollTop = maxScroll;
+              // Verify we actually scrolled to bottom, retry if needed
+              setTimeout(() => {
+                const newMaxScroll = scrollArea.scrollHeight - scrollArea.clientHeight;
+                if (newMaxScroll > scrollArea.scrollTop + 5) {
+                  scrollArea.scrollTop = newMaxScroll;
+                }
+              }, 100);
+            }
+          };
+          
+          // Try multiple times as content may load
+          setTimeout(scrollToBottom, 50);
+          setTimeout(scrollToBottom, 200);
+          setTimeout(scrollToBottom, 500);
+        }
+      });
 
       // Fade Overlays - append after scrollArea so they're on top
       const topFade = document.createElement('div');
@@ -429,9 +454,12 @@
       bottomFade.className = 'toc-fade-overlay';
       container.appendChild(bottomFade);
 
-      // Cleanup old observer if re-rendering references same container object
+      // Cleanup old observers if re-rendering references same container object
       if (container.resizeObserver) {
         container.resizeObserver.disconnect();
+      }
+      if (container.listObserver) {
+        container.listObserver.disconnect();
       }
 
       // Smart Logic & Recalibration
@@ -464,6 +492,18 @@
         } else {
           // Show bottom fade if there's scrollable content
           bottomFade.classList.remove('hidden');
+          // Force visibility
+          bottomFade.style.visibility = 'visible';
+          bottomFade.style.opacity = '1';
+        }
+        
+        // Ensure top fade visibility is set correctly
+        if (topFade.classList.contains('visible')) {
+          topFade.style.visibility = 'visible';
+          topFade.style.opacity = '1';
+        } else {
+          topFade.style.visibility = 'hidden';
+          topFade.style.opacity = '0';
         }
       };
 
@@ -480,28 +520,56 @@
 
       // Observer for resizes (Recalibrates positions)
       container.resizeObserver = new ResizeObserver(() => {
+        // Force recalculation of scroll height when container resizes
+        void scrollArea.scrollHeight;
+        void list.scrollHeight;
         updateLayout();
       });
       container.resizeObserver.observe(container);
+      
+      // Also observe the list for changes (new items might be added)
+      const listObserver = new MutationObserver(() => {
+        // When list changes, recalculate scroll height
+        requestAnimationFrame(() => {
+          void scrollArea.scrollHeight;
+          void list.scrollHeight;
+          updateLayout();
+        });
+      });
+      listObserver.observe(list, {
+        childList: true,
+        subtree: true
+      });
+      
+      // Store observer for cleanup
+      container.listObserver = listObserver;
 
       // Init layout and fade overlays
       requestAnimationFrame(() => {
+        // Force layout recalculation before updating
+        void scrollArea.offsetHeight;
+        void scrollArea.scrollHeight;
+        
         updateLayout();
+        
         // After layout update, check if we need to scroll to bottom on initial load
         if (isInitialLoad && restoredState.scrollTop === null) {
           setTimeout(() => {
+            // Recalculate to ensure we have latest measurements
+            void scrollArea.scrollHeight;
             const maxScroll = scrollArea.scrollHeight - scrollArea.clientHeight;
             if (maxScroll > 0) {
               scrollArea.scrollTop = maxScroll;
               // Update layout again after scrolling to show correct fade overlays
               setTimeout(() => {
+                void scrollArea.scrollHeight; // Recalculate again
                 updateLayout();
-              }, 100);
+              }, 150);
             } else {
               // Even if no scroll needed, update layout to ensure fade overlays are correct
               updateLayout();
             }
-          }, 200);
+          }, 250);
         }
       });
       
