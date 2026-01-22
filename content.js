@@ -226,24 +226,26 @@
     
     if (!isInViewport) {
       // Element not in viewport, scroll it into view first to trigger loading
-      element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      // Use 'start' to position at top, not center
+      element.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
 
     // Wait for element to be loaded and content to stabilize
     waitForElementLoad(element, 2000).then((isLoaded) => {
       // Give a bit more time for content to fully render after loading
       setTimeout(() => {
-        // Now calculate the exact scroll position
-        const rect = element.getBoundingClientRect();
+        // Calculate the exact scroll position to place element at top
         const expectedTop = 80; // scrollMarginTop value
+        const rect = element.getBoundingClientRect();
         const currentTop = rect.top;
         const scrollY = window.scrollY || window.pageYOffset;
         
-        // Calculate the target scroll position
+        // Calculate target scroll: element's current position in viewport minus desired offset
+        // This positions the TOP of the element at expectedTop from viewport top
         const adjustment = currentTop - expectedTop;
         const targetScroll = scrollY + adjustment;
 
-        // Scroll to the exact position
+        // Scroll to position the element at the top (not center)
         window.scrollTo({
           top: targetScroll,
           behavior: 'smooth'
@@ -255,13 +257,14 @@
           const finalTop = finalRect.top;
           const tolerance = 20; // Tighter tolerance for final check
 
-          // If still not at exact position, do a final precise adjustment
+          // Verify the top of the element is at expectedTop
           if (Math.abs(finalTop - expectedTop) > tolerance) {
+            // Fine-tune: adjust scroll to place top of element exactly at expectedTop
             const finalScrollY = window.scrollY || window.pageYOffset;
             const finalAdjustment = finalTop - expectedTop;
             const preciseScroll = finalScrollY + finalAdjustment;
             
-            // Final precise scroll without animation
+            // Final precise scroll without animation to position at top
             window.scrollTo({
               top: preciseScroll,
               behavior: 'auto'
@@ -271,6 +274,7 @@
               isManualScrolling = false;
             }, 50);
           } else {
+            // Element is correctly positioned at the top
             isManualScrolling = false;
           }
         }, 600); // Wait for smooth scroll animation
