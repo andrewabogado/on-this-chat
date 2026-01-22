@@ -2,9 +2,10 @@
 #chatgpt-toc-sidebar {
   position: fixed;
   top: 80px;
+  bottom: 12px;
   /* Lower it slightly */
   right: 20px;
-  width: 240px;
+  width: 220px;
   /* height: calc(100vh - 120px); */
   /* max-height: calc(100vh - 120px); */
   background: transparent;
@@ -19,8 +20,7 @@
   border: none;
   border-radius: 8px;
   padding: 12px;
-  padding-bottom: 0;
-  overflow: visible;
+  overflow: hidden;
   z-index: 10;
   display: flex;
   flex-direction: column;
@@ -40,15 +40,16 @@
 
 /* Header */
 #chatgpt-toc-sidebar h2 {
-  font-size: 13px;
+  font-size: 12px;
   /* Slightly bumped for readability vs 12px body? Or keep 12? User said 12 before. Let's stick to 12 but Ensure it looks good. */
   font-weight: 400;
   /* Normal */
   margin: 0 0 8px 0;
-  color: #737373;
+  color: #8f8f8f;
   /* Requested color */
   /* text-transform: removed */
   letter-spacing: normal;
+  padding-left: 16px;
 }
 
 /* List Items */
@@ -101,9 +102,9 @@
   text-overflow: ellipsis;
   cursor: pointer;
   flex-grow: 1;
-  font-size: 14px;
-  line-height: 1.5;
-  font-weight: 400;
+  line-height: 1.4;
+  font-size: 12.5px;
+  font-weight: 300;
 }
 
 .toc-link:hover {
@@ -139,7 +140,7 @@
 /* Follow-up Icon - Hanging bullet style */
 .toc-follow-up-icon {
   color: #9ca3af;
-  font-size: 14px;
+  font-size: 12px;
   position: absolute;
   left: -14px;
   top: 3px;
@@ -176,9 +177,10 @@
 .toc-scroll-area {
   flex: 1 1 0;
   min-height: 0;
-  overflow-y: scroll;
-  overflow-x: visible;
-  padding-bottom: 60px;
+  height: calc(100% - 20px);
+  overflow-y: auto;
+  /* overflow-x: visible; */
+  padding-bottom: 40px;
   /* Increased space matching fade height */
   /* Hide Scrollbar */
   scrollbar-width: none;
@@ -198,7 +200,7 @@
   bottom: 0;
   left: 12px;
   right: 12px;
-  height: 60px;
+  height: 40px;
   background: linear-gradient(to bottom, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.9) 60%, rgba(255, 255, 255, 1) 100%);
   pointer-events: none;
   z-index: 30;

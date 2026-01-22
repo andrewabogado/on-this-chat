@@ -38,13 +38,13 @@
     if (article.id && article.id.startsWith('toc-sec-')) {
       return article.id;
     }
-    
+
     // Try to use data-testid if available
     const testId = article.getAttribute('data-testid');
     if (testId) {
       return `toc-${testId}`;
     }
-    
+
     // Fall back to index-based ID, but try to make it stable
     // Use the article's position relative to other articles
     return `toc-sec-${index}`;
@@ -59,7 +59,7 @@
     // Find all user messages first - this is the most reliable way
     const userMessages = document.querySelectorAll('[data-message-author-role="user"]');
     const articleMap = new Map();
-    
+
     // Build a map of articles by finding the article parent of each user message
     userMessages.forEach((userMsg, index) => {
       // Walk up the DOM tree to find the article parent
@@ -69,12 +69,12 @@
         parent = parent.parentElement;
         depth++;
       }
-      
+
       if (parent && parent.tagName === 'ARTICLE') {
         // Use a stable key - try data-testid first, then fall back to position
         const testId = parent.getAttribute('data-testid');
         const key = testId || `article-${index}`;
-        
+
         if (!articleMap.has(key)) {
           articleMap.set(key, {
             article: parent,
@@ -157,18 +157,18 @@
    */
   function isElementLoaded(element) {
     if (!element) return false;
-    
+
     const rect = element.getBoundingClientRect();
     // Element should have some height (at least 10px) to be considered loaded
     if (rect.height < 10) return false;
-    
+
     // Check if element has visible content
     const userMsg = element.querySelector('[data-message-author-role="user"]');
     if (userMsg) {
       const userRect = userMsg.getBoundingClientRect();
       if (userRect.height < 5) return false;
     }
-    
+
     return true;
   }
 
@@ -216,13 +216,13 @@
     // This ensures any lazy-loaded content is included in height calculations
     const body = document.body;
     const html = document.documentElement;
-    
+
     // Access properties that trigger layout recalculation
     void body.offsetHeight;
     void html.offsetHeight;
     void body.scrollHeight;
     void html.scrollHeight;
-    
+
     // Also check for any scroll containers that might have changed
     const scrollContainers = document.querySelectorAll('[style*="overflow"], [class*="overflow"]');
     scrollContainers.forEach(container => {
@@ -251,7 +251,7 @@
     // Step 2: Bring element into viewport to trigger lazy loading if needed
     const initialRect = element.getBoundingClientRect();
     const isInViewport = initialRect.top < window.innerHeight && initialRect.bottom > 0;
-    
+
     if (!isInViewport) {
       // Element not in viewport, scroll it into view first to trigger loading
       // Use 'start' to position at top, not center
@@ -264,13 +264,13 @@
       // This accounts for any content that loaded during the wait
       setTimeout(() => {
         recalculateContainerHeight();
-        
+
         // Step 5: Get fresh measurements after height recalculation
         const rect = element.getBoundingClientRect();
         const expectedTop = 80; // scrollMarginTop value
         const currentTop = rect.top;
         const scrollY = window.scrollY || window.pageYOffset;
-        
+
         // Calculate target scroll: element's current position in viewport minus desired offset
         // This positions the TOP of the element at expectedTop from viewport top
         const adjustment = currentTop - expectedTop;
@@ -286,7 +286,7 @@
         scrollTimeout = setTimeout(() => {
           // Recalculate height again in case more content loaded during scroll
           recalculateContainerHeight();
-          
+
           const finalRect = element.getBoundingClientRect();
           const finalTop = finalRect.top;
           const tolerance = 20; // Tighter tolerance for final check
@@ -300,13 +300,13 @@
             const finalScrollY = window.scrollY || window.pageYOffset;
             const finalAdjustment = freshTop - expectedTop;
             const preciseScroll = finalScrollY + finalAdjustment;
-            
+
             // Final precise scroll without animation to position at top
             window.scrollTo({
               top: preciseScroll,
               behavior: 'auto'
             });
-            
+
             scrollTimeout = setTimeout(() => {
               isManualScrolling = false;
             }, 50);
@@ -347,7 +347,6 @@
     titleEl.innerText = 'On This Chat';
     titleEl.style.margin = '0';
     titleEl.style.border = 'none';
-    titleEl.style.paddingLeft = '14px';
 
     headerDiv.appendChild(titleEl);
     container.appendChild(headerDiv);
@@ -417,7 +416,7 @@
         void scrollArea.scrollHeight;
         void list.offsetHeight;
         void list.scrollHeight;
-        
+
         // Restore scroll position or scroll to bottom on initial load
         if (restoredState.scrollTop !== undefined && restoredState.scrollTop !== null) {
           scrollArea.scrollTop = restoredState.scrollTop;
@@ -437,7 +436,7 @@
               }, 100);
             }
           };
-          
+
           // Try multiple times as content may load
           setTimeout(scrollToBottom, 50);
           setTimeout(scrollToBottom, 200);
@@ -485,8 +484,8 @@
         }
 
         // 3. Bottom Fade Visibility - show when there's more content below
-        const isAtBottom = scrollHeight <= clientHeight || 
-                          Math.ceil(scrollTop + clientHeight) >= scrollHeight - 5;
+        const isAtBottom = scrollHeight <= clientHeight ||
+          Math.ceil(scrollTop + clientHeight) >= scrollHeight - 5;
         if (isAtBottom) {
           bottomFade.classList.add('hidden');
         } else {
@@ -496,7 +495,7 @@
           bottomFade.style.visibility = 'visible';
           bottomFade.style.opacity = '1';
         }
-        
+
         // Ensure top fade visibility is set correctly
         if (topFade.classList.contains('visible')) {
           topFade.style.visibility = 'visible';
@@ -509,7 +508,7 @@
 
       scrollArea.addEventListener('scroll', () => {
         updateLayout();
-        
+
         // Track manual TOC scrolling to prevent auto-scroll interference
         isManualTOCScrolling = true;
         clearTimeout(tocScrollTimeout);
@@ -526,7 +525,7 @@
         updateLayout();
       });
       container.resizeObserver.observe(container);
-      
+
       // Also observe the list for changes (new items might be added)
       const listObserver = new MutationObserver(() => {
         // When list changes, recalculate scroll height
@@ -540,7 +539,7 @@
         childList: true,
         subtree: true
       });
-      
+
       // Store observer for cleanup
       container.listObserver = listObserver;
 
@@ -549,9 +548,9 @@
         // Force layout recalculation before updating
         void scrollArea.offsetHeight;
         void scrollArea.scrollHeight;
-        
+
         updateLayout();
-        
+
         // After layout update, check if we need to scroll to bottom on initial load
         if (isInitialLoad && restoredState.scrollTop === null) {
           setTimeout(() => {
@@ -572,7 +571,7 @@
           }, 250);
         }
       });
-      
+
       // Update active section after rendering
       setTimeout(() => {
         updateActiveSection();
@@ -600,12 +599,12 @@
     links.forEach(link => {
       const targetId = link.dataset.target;
       if (!targetId) return;
-      
+
       const el = document.getElementById(targetId);
       if (!el) return;
 
       const rect = el.getBoundingClientRect();
-      
+
       // Check if element is in or near viewport
       const isInViewport = rect.bottom > 0 && rect.top < window.innerHeight;
       const isAboveViewport = rect.bottom <= 0;
@@ -660,7 +659,7 @@
     for (const link of links) {
       const targetId = link.dataset.target;
       if (!targetId) continue;
-      
+
       const el = document.getElementById(targetId);
       if (el) {
         const rect = el.getBoundingClientRect();
@@ -691,7 +690,7 @@
   // Handle scroll events - ChatGPT might scroll on window or a specific container
   function handleScroll() {
     if (isManualScrolling) return;
-    
+
     // Clear existing timeout and set a new one (throttling)
     if (spyTimeout) {
       clearTimeout(spyTimeout);
@@ -704,7 +703,7 @@
 
   // Listen to window scroll - this is the main scroll event
   window.addEventListener('scroll', handleScroll, { passive: true });
-  
+
   // Also try to find and listen to the main scroll container (ChatGPT often uses a specific div)
   const scrollContainers = new Set();
   const findScrollContainer = () => {
@@ -716,15 +715,15 @@
       'div[class*="overflow"]',
       '[data-testid*="conversation"]'
     ];
-    
+
     for (const selector of possibleContainers) {
       const containers = document.querySelectorAll(selector);
       for (const container of containers) {
         if (scrollContainers.has(container)) continue; // Already listening
-        
+
         const style = window.getComputedStyle(container);
-        if (style.overflowY === 'auto' || style.overflowY === 'scroll' || 
-            style.overflow === 'auto' || style.overflow === 'scroll') {
+        if (style.overflowY === 'auto' || style.overflowY === 'scroll' ||
+          style.overflow === 'auto' || style.overflow === 'scroll') {
           container.addEventListener('scroll', handleScroll, { passive: true });
           scrollContainers.add(container);
         }
@@ -763,28 +762,28 @@
           // Use getBoundingClientRect for accurate positioning
           const linkRect = link.getBoundingClientRect();
           const scrollAreaRect = scrollArea.getBoundingClientRect();
-          
+
           // Calculate link position relative to scroll area viewport
           const linkTopRelative = linkRect.top - scrollAreaRect.top + scrollArea.scrollTop;
           const linkBottomRelative = linkRect.bottom - scrollAreaRect.top + scrollArea.scrollTop;
-          
+
           // Get scroll area dimensions
           const scrollAreaTop = scrollArea.scrollTop;
           const scrollAreaHeight = scrollArea.clientHeight;
           const linkHeight = linkRect.height;
-          
+
           // Check if link is visible in scroll area with some margin
           const margin = 10; // Small margin for "close enough"
           const isAbove = linkBottomRelative < scrollAreaTop - margin;
           const isBelow = linkTopRelative > scrollAreaTop + scrollAreaHeight + margin;
-          const isFullyVisible = linkTopRelative >= scrollAreaTop - margin && 
-                                linkBottomRelative <= scrollAreaTop + scrollAreaHeight + margin;
-          
+          const isFullyVisible = linkTopRelative >= scrollAreaTop - margin &&
+            linkBottomRelative <= scrollAreaTop + scrollAreaHeight + margin;
+
           // Always try to keep the active link visible and well-positioned
           // Use a more aggressive approach: center it if it's not well-positioned
           const padding = 40; // Padding from edges for better visibility
           let targetScroll;
-          
+
           if (isAbove) {
             // Link is above visible area - scroll to show it at top with padding
             targetScroll = linkTopRelative - padding;
@@ -798,7 +797,7 @@
             // Link is visible, but check if it's too close to edges
             const distanceFromTop = linkTopRelative - scrollAreaTop;
             const distanceFromBottom = (scrollAreaTop + scrollAreaHeight) - linkBottomRelative;
-            
+
             // If too close to top or bottom, center it
             if (distanceFromTop < padding || distanceFromBottom < padding) {
               targetScroll = linkTopRelative - (scrollAreaHeight / 2) + (linkHeight / 2);
@@ -807,11 +806,11 @@
               return;
             }
           }
-          
+
           // Ensure we don't scroll beyond bounds
           const maxScroll = Math.max(0, scrollArea.scrollHeight - scrollAreaHeight);
           targetScroll = Math.max(0, Math.min(targetScroll, maxScroll));
-          
+
           // Scroll to target position
           scrollArea.scrollTo({
             top: targetScroll,
@@ -841,7 +840,7 @@
       document.body.scrollHeight,
       document.documentElement.scrollHeight
     ) - window.innerHeight;
-    
+
     // If we're already near the bottom, just check once
     if (originalScrollY > maxScroll - 500) {
       callback();
@@ -868,14 +867,14 @@
       window.scrollTo({ top: currentScroll, behavior: 'auto' });
 
       scrollAttempts++;
-      
+
       // Wait for content to load, then continue or finish
       setTimeout(() => {
         const newScrollHeight = Math.max(
           document.body.scrollHeight,
           document.documentElement.scrollHeight
         );
-        
+
         // If we've reached the bottom or no new content loaded, finish
         if (currentScroll >= maxScroll - 100 || newScrollHeight <= lastKnownScrollHeight + 50) {
           window.scrollTo({ top: originalScrollY, behavior: 'auto' });
@@ -898,13 +897,13 @@
    */
   function watchForNewContent() {
     if (scrollHeightCheckInterval) return; // Already watching
-    
+
     scrollHeightCheckInterval = setInterval(() => {
       const currentScrollHeight = Math.max(
         document.body.scrollHeight,
         document.documentElement.scrollHeight
       );
-      
+
       if (currentScrollHeight > lastKnownScrollHeight) {
         lastKnownScrollHeight = currentScrollHeight;
         // New content detected, refresh TOC
@@ -927,13 +926,13 @@
       document.body.scrollHeight,
       document.documentElement.scrollHeight
     );
-    
+
     const structure = parseConversation();
-    
+
     // If we found fewer articles than before, or if scroll height suggests more content,
     // try scanning for more articles
-    if (structure.length < lastKnownArticleCount || 
-        (currentScrollHeight > lastKnownScrollHeight + 500 && structure.length < 50)) {
+    if (structure.length < lastKnownArticleCount ||
+      (currentScrollHeight > lastKnownScrollHeight + 500 && structure.length < 50)) {
       // Trigger background scan
       scanForAllArticles(() => {
         const newStructure = parseConversation();
@@ -981,7 +980,7 @@
         isInitialLoad = false;
       });
     }, 1500);
-    
+
     // Mark initial load as complete after a delay (in case scan doesn't run)
     setTimeout(() => {
       isInitialLoad = false;
@@ -994,9 +993,9 @@
         if (mutation.type === 'childList') {
           for (const node of mutation.addedNodes) {
             if (node.nodeType === Node.ELEMENT_NODE) {
-              if (node.tagName === 'ARTICLE' || 
-                  node.querySelector?.('article') ||
-                  node.querySelector?.('[data-message-author-role="user"]')) {
+              if (node.tagName === 'ARTICLE' ||
+                node.querySelector?.('article') ||
+                node.querySelector?.('[data-message-author-role="user"]')) {
                 return true;
               }
             }
@@ -1004,7 +1003,7 @@
         }
         return false;
       });
-      
+
       if (hasRelevantChanges) {
         clearTimeout(debounceTimer);
         debounceTimer = setTimeout(refreshTOC, 500); // Faster refresh for relevant changes
