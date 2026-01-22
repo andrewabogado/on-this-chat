@@ -5,6 +5,7 @@
   /* Lower it slightly */
   right: 20px;
   width: 240px;
+  height: calc(100vh - 120px);
   max-height: calc(100vh - 120px);
   background: transparent;
   /* Minimal transparent background */
@@ -97,7 +98,7 @@
   text-overflow: ellipsis;
   cursor: pointer;
   flex-grow: 1;
-  font-size: 12px;
+  font-size: 14px;
   line-height: 1.5;
   font-weight: 400;
 }
@@ -135,7 +136,7 @@
 /* Follow-up Icon - Hanging bullet style */
 .toc-follow-up-icon {
   color: #9ca3af;
-  font-size: 12px;
+  font-size: 14px;
   position: absolute;
   left: -14px;
   top: 3px;
@@ -170,8 +171,10 @@
 
 /* Scroll Area */
 .toc-scroll-area {
-  flex-grow: 1;
+  flex: 1 1 0;
+  min-height: 0;
   overflow-y: auto;
+  overflow-x: hidden;
   padding-bottom: 60px;
   /* Increased space matching fade height */
   /* Hide Scrollbar */

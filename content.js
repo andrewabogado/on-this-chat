@@ -11,7 +11,7 @@
       // We rely on data-testid or stable attributes where possible.
       // 2024 Strategy: Look for the main 'article' elements or similar wrappers.
       // Current observation suggests: article[data-testid^="conversation-turn-"]
-      messageBlock: 'article',
+      messageBlock: 'article[data-testid^="conversation-turn-"], article',
       userMessage: '[data-message-author-role="user"]',
       assistantMessage: '[data-message-author-role="assistant"]',
       // Headers within assistant response - Limited to H1/H2 per user request
@@ -24,60 +24,129 @@
   let debounceTimer = null;
   let isManualScrolling = false;
   let scrollTimeout = null;
+  let isManualTOCScrolling = false;
+  let tocScrollTimeout = null;
 
 
   // --- Core Logic ---
 
   /**
+   * Generates a stable ID for an article based on its content and position
+   */
+  function getStableArticleId(article, index) {
+    // Try to use existing ID if it's one of ours
+    if (article.id && article.id.startsWith('toc-sec-')) {
+      return article.id;
+    }
+    
+    // Try to use data-testid if available
+    const testId = article.getAttribute('data-testid');
+    if (testId) {
+      return `toc-${testId}`;
+    }
+    
+    // Fall back to index-based ID, but try to make it stable
+    // Use the article's position relative to other articles
+    return `toc-sec-${index}`;
+  }
+
+  /**
    * Scans the DOM for conversation turns and builds a hierarchical structure.
+   * Handles lazy-loaded content by trying multiple strategies.
    * @returns {Array} Array of section objects { id, title, type, element, children }
    */
   function parseConversation() {
-    const articles = document.querySelectorAll(SETTINGS.selectors.messageBlock);
-    const structure = [];
-
-    articles.forEach((article, index) => {
-      // Identify who is speaking
-      const userMsg = article.querySelector(SETTINGS.selectors.userMessage);
-      const assistantMsg = article.querySelector(SETTINGS.selectors.assistantMessage);
-
-      if (userMsg) {
-        // --- User Turn ---
-        // User messages are top-level sections
-        let title = userMsg.innerText.split('\n')[0].trim();
-        if (title.length > 50) title = title.substring(0, 50) + '...';
-        if (!title) title = `User Message ${index + 1}`;
-
-        // Ensure scroll lands with buffer
-        article.style.scrollMarginTop = '80px';
-
-        // Assign ID for scroll spy targeting
-        const sectionId = `toc-sec-${index}`;
-        article.id = sectionId;
-
-        // Check if this is a follow-up/branch message
-        // ChatGPT shows branch navigation arrows (< >) when a message has branches
-        // Look for the branch navigation controls near the user message
-        const hasBranchNav = article.querySelector('[data-testid*="branch"]') !== null ||
-          article.querySelector('button[aria-label*="branch"]') !== null ||
-          article.querySelector('button[aria-label*="previous"]') !== null ||
-          // Check for the "1/2" style branch indicator text
-          article.querySelector('[class*="text-xs"]')?.innerText?.match(/^\d+\/\d+$/) !== null;
-
-        const isFollowUp = hasBranchNav;
-
-        structure.push({
-          id: sectionId,
-          title: title,
-          type: 'user',
-          element: article,
-          isFollowUp: isFollowUp,
-          children: []
-        });
-
+    // Find all user messages first - this is the most reliable way
+    const userMessages = document.querySelectorAll('[data-message-author-role="user"]');
+    const articleMap = new Map();
+    
+    // Build a map of articles by finding the article parent of each user message
+    userMessages.forEach((userMsg, index) => {
+      // Walk up the DOM tree to find the article parent
+      let parent = userMsg.parentElement;
+      let depth = 0;
+      while (parent && parent.tagName !== 'ARTICLE' && parent !== document.body && depth < 20) {
+        parent = parent.parentElement;
+        depth++;
       }
-      // else if (assistantMsg) { ... } -> Removed per simplification request.
-      // We only want top-level User Messages.
+      
+      if (parent && parent.tagName === 'ARTICLE') {
+        // Use a stable key - try data-testid first, then fall back to position
+        const testId = parent.getAttribute('data-testid');
+        const key = testId || `article-${index}`;
+        
+        if (!articleMap.has(key)) {
+          articleMap.set(key, {
+            article: parent,
+            userMsg: userMsg,
+            originalIndex: index
+          });
+        }
+      }
+    });
+
+    // Also try direct article selectors as backup
+    const directArticles = document.querySelectorAll('article[data-testid^="conversation-turn-"], article');
+    directArticles.forEach((article) => {
+      const userMsg = article.querySelector('[data-message-author-role="user"]');
+      if (userMsg) {
+        const testId = article.getAttribute('data-testid');
+        const key = testId || `article-direct-${articleMap.size}`;
+        if (!articleMap.has(key)) {
+          articleMap.set(key, {
+            article: article,
+            userMsg: userMsg,
+            originalIndex: articleMap.size
+          });
+        }
+      }
+    });
+
+    // Convert to array and sort by DOM position
+    const articles = Array.from(articleMap.values());
+    articles.sort((a, b) => {
+      const pos = a.article.compareDocumentPosition(b.article);
+      if (pos & Node.DOCUMENT_POSITION_FOLLOWING) return -1;
+      if (pos & Node.DOCUMENT_POSITION_PRECEDING) return 1;
+      return a.originalIndex - b.originalIndex;
+    });
+
+    const structure = [];
+    let userMessageIndex = 0;
+
+    articles.forEach(({ article, userMsg }) => {
+      // --- User Turn ---
+      // User messages are top-level sections
+      let title = userMsg.innerText.split('\n')[0].trim();
+      if (title.length > 50) title = title.substring(0, 50) + '...';
+      if (!title) title = `User Message ${userMessageIndex + 1}`;
+
+      // Ensure scroll lands with buffer
+      article.style.scrollMarginTop = '80px';
+
+      // Assign stable ID for scroll spy targeting
+      const sectionId = getStableArticleId(article, userMessageIndex);
+      article.id = sectionId;
+
+      // Check if this is a follow-up message by looking for the specific ↳ visual treatment
+      // This icon is typically used in ChatGPT to indicate a branch or follow-up turn.
+      const isFollowUp = article.innerText.includes('↳') ||
+        article.querySelector('svg[data-testid="follow-up-icon"]') !== null ||
+        Array.from(article.querySelectorAll('svg')).some(svg =>
+          svg.innerHTML.includes('M11 19l9-7-9-7v14z') || // Right arrow path
+          svg.innerHTML.includes('M9 5l7 7-7 7') // Chevron path
+        );
+
+      structure.push({
+        id: sectionId,
+        title: title,
+        type: 'user',
+        element: article,
+        isFollowUp: isFollowUp,
+        children: []
+      });
+
+      userMessageIndex++;
     });
 
     return structure;
@@ -253,7 +322,16 @@
         }
       };
 
-      scrollArea.addEventListener('scroll', updateLayout);
+      scrollArea.addEventListener('scroll', () => {
+        updateLayout();
+        
+        // Track manual TOC scrolling to prevent auto-scroll interference
+        isManualTOCScrolling = true;
+        clearTimeout(tocScrollTimeout);
+        tocScrollTimeout = setTimeout(() => {
+          isManualTOCScrolling = false;
+        }, 150);
+      });
 
       // Observer for resizes (Recalibrates positions)
       container.resizeObserver = new ResizeObserver(() => {
@@ -263,6 +341,11 @@
 
       // Init
       requestAnimationFrame(updateLayout);
+      
+      // Update active section after rendering
+      setTimeout(() => {
+        updateActiveSection();
+      }, 50);
     }
   }
 
@@ -277,37 +360,96 @@
     let closestDistance = Infinity;
 
     const links = document.querySelectorAll('.toc-link');
+    if (links.length === 0) return;
+
     const currentActive = document.querySelector('.toc-link.active');
     const currentActiveId = currentActive ? currentActive.dataset.target : null;
 
+    // Find the section that's closest to the target position
     links.forEach(link => {
       const targetId = link.dataset.target;
+      if (!targetId) return;
+      
       const el = document.getElementById(targetId);
-      if (el) {
-        const rect = el.getBoundingClientRect();
+      if (!el) return;
 
-        // Priority check: if this is the currently active item, give it a "bonus" to stay active
-        // unless another item is significantly closer to the target position.
-        let distance = Math.abs(rect.top - targetPosition);
-        if (targetId === currentActiveId) {
-          distance -= 20; // 20px "stickiness" bonus
+      const rect = el.getBoundingClientRect();
+      
+      // Check if element is in or near viewport
+      const isInViewport = rect.bottom > 0 && rect.top < window.innerHeight;
+      const isAboveViewport = rect.bottom <= 0;
+      const isNearViewport = rect.top < window.innerHeight + 200; // Allow some margin
+
+      if (isInViewport || isAboveViewport) {
+        // Calculate distance from target position
+        // For elements above viewport, use their bottom edge
+        // For elements in viewport, use their top edge
+        let distance;
+        if (isAboveViewport) {
+          // Element is above - use distance from bottom of element to target
+          distance = Math.abs(rect.bottom - targetPosition);
+        } else {
+          // Element is in viewport - use distance from top to target
+          distance = Math.abs(rect.top - targetPosition);
         }
 
-        if (rect.top <= window.innerHeight / 2) {
-          if (distance < closestDistance) {
-            closestDistance = distance;
-            activeId = targetId;
-          }
+        // Give current active item a "stickiness" bonus to prevent flickering
+        if (targetId === currentActiveId) {
+          distance -= 30; // 30px stickiness bonus
+        }
+
+        // Prefer elements that have been scrolled past (above target) or are at target
+        // But also consider elements that are close
+        if (distance < closestDistance) {
+          closestDistance = distance;
+          activeId = targetId;
+        }
+      } else if (isNearViewport && rect.top < targetPosition + 300) {
+        // For elements just below viewport but close, also consider them
+        // This helps when scrolling down
+        let distance = Math.abs(rect.top - targetPosition);
+        if (targetId === currentActiveId) {
+          distance -= 30;
+        }
+        if (distance < closestDistance) {
+          closestDistance = distance;
+          activeId = targetId;
         }
       }
     });
 
-    // Fallback to first item
-    if (!activeId && links.length > 0) {
-      activeId = links[0].dataset.target;
+    // If we found an active item, use it
+    if (activeId) {
+      setActiveLink(activeId, false);
+      return;
     }
 
-    setActiveLink(activeId, true);
+    // Fallback: find the last element that's been scrolled past
+    let lastScrolledPast = null;
+    for (const link of links) {
+      const targetId = link.dataset.target;
+      if (!targetId) continue;
+      
+      const el = document.getElementById(targetId);
+      if (el) {
+        const rect = el.getBoundingClientRect();
+        if (rect.top <= targetPosition + 50) {
+          lastScrolledPast = targetId;
+        } else {
+          break; // Elements are in order, so we can stop
+        }
+      }
+    }
+
+    if (lastScrolledPast) {
+      setActiveLink(lastScrolledPast, false);
+      return;
+    }
+
+    // Last resort: use first item
+    if (links.length > 0 && links[0].dataset.target) {
+      setActiveLink(links[0].dataset.target, false);
+    }
   }
 
   // Throttle scroll spy with stability check to reduce flickering
@@ -315,13 +457,53 @@
   let lastActiveId = null;
   let stabilityCount = 0;
 
-  window.addEventListener('scroll', () => {
-    if (spyTimeout) return;
+  // Handle scroll events - ChatGPT might scroll on window or a specific container
+  function handleScroll() {
+    if (isManualScrolling) return;
+    
+    // Clear existing timeout and set a new one (throttling)
+    if (spyTimeout) {
+      clearTimeout(spyTimeout);
+    }
     spyTimeout = setTimeout(() => {
       updateActiveSection();
       spyTimeout = null;
-    }, 200); // Increased to 200ms for more stability
-  });
+    }, 50); // Reduced to 50ms for better responsiveness
+  }
+
+  // Listen to window scroll - this is the main scroll event
+  window.addEventListener('scroll', handleScroll, { passive: true });
+  
+  // Also try to find and listen to the main scroll container (ChatGPT often uses a specific div)
+  const scrollContainers = new Set();
+  const findScrollContainer = () => {
+    // Common ChatGPT scroll container selectors
+    const possibleContainers = [
+      'main',
+      '[role="main"]',
+      '.flex.flex-col.text-sm',
+      'div[class*="overflow"]',
+      '[data-testid*="conversation"]'
+    ];
+    
+    for (const selector of possibleContainers) {
+      const containers = document.querySelectorAll(selector);
+      for (const container of containers) {
+        if (scrollContainers.has(container)) continue; // Already listening
+        
+        const style = window.getComputedStyle(container);
+        if (style.overflowY === 'auto' || style.overflowY === 'scroll' || 
+            style.overflow === 'auto' || style.overflow === 'scroll') {
+          container.addEventListener('scroll', handleScroll, { passive: true });
+          scrollContainers.add(container);
+        }
+      }
+    }
+  };
+
+  // Try to find scroll container after delays (DOM might not be ready)
+  setTimeout(findScrollContainer, 500);
+  setTimeout(findScrollContainer, 2000);
   function setActiveLink(targetId, skipScroll = false) {
     if (!targetId) return;
 
@@ -343,11 +525,124 @@
 
       // 2. Manage Active State (Simple)
 
-      // Auto-scroll sidebar logic:
-      if (!skipScroll) {
-        link.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      // Auto-scroll sidebar logic: Scroll the TOC scroll area to keep active link visible
+      if (!skipScroll && !isManualTOCScrolling) {
+        const scrollArea = document.querySelector('.toc-scroll-area');
+        if (scrollArea) {
+          const linkRect = link.getBoundingClientRect();
+          const scrollAreaRect = scrollArea.getBoundingClientRect();
+          
+          // Check if link is outside the visible area
+          const isAbove = linkRect.top < scrollAreaRect.top;
+          const isBelow = linkRect.bottom > scrollAreaRect.bottom;
+          
+          if (isAbove || isBelow) {
+            // Calculate the scroll position needed to center the link (or at least make it visible)
+            const linkOffsetTop = link.offsetTop;
+            const scrollAreaHeight = scrollArea.clientHeight;
+            const linkHeight = link.offsetHeight;
+            
+            // Center the link in the scroll area
+            const targetScroll = linkOffsetTop - (scrollAreaHeight / 2) + (linkHeight / 2);
+            
+            scrollArea.scrollTo({
+              top: Math.max(0, targetScroll),
+              behavior: 'smooth'
+            });
+          }
+        }
       }
     }
+  }
+
+  let lastKnownScrollHeight = 0;
+  let lastKnownArticleCount = 0;
+  let scrollHeightCheckInterval = null;
+  let isScanningForArticles = false;
+
+  /**
+   * Attempts to trigger lazy loading by scrolling through the page incrementally
+   * This is done in the background without disrupting user's current scroll position
+   */
+  function scanForAllArticles(callback) {
+    if (isScanningForArticles) return;
+    isScanningForArticles = true;
+
+    const originalScrollY = window.scrollY;
+    const maxScroll = Math.max(
+      document.body.scrollHeight,
+      document.documentElement.scrollHeight
+    ) - window.innerHeight;
+    
+    // If we're already near the bottom, just check once
+    if (originalScrollY > maxScroll - 500) {
+      callback();
+      isScanningForArticles = false;
+      return;
+    }
+
+    // Scroll incrementally to trigger lazy loading
+    let currentScroll = originalScrollY;
+    const scrollStep = window.innerHeight * 2; // Scroll 2 viewports at a time
+    let scrollAttempts = 0;
+    const maxAttempts = 10;
+
+    const scrollAndCheck = () => {
+      if (scrollAttempts >= maxAttempts) {
+        // Restore original scroll position
+        window.scrollTo({ top: originalScrollY, behavior: 'auto' });
+        callback();
+        isScanningForArticles = false;
+        return;
+      }
+
+      currentScroll = Math.min(currentScroll + scrollStep, maxScroll);
+      window.scrollTo({ top: currentScroll, behavior: 'auto' });
+
+      scrollAttempts++;
+      
+      // Wait for content to load, then continue or finish
+      setTimeout(() => {
+        const newScrollHeight = Math.max(
+          document.body.scrollHeight,
+          document.documentElement.scrollHeight
+        );
+        
+        // If we've reached the bottom or no new content loaded, finish
+        if (currentScroll >= maxScroll - 100 || newScrollHeight <= lastKnownScrollHeight + 50) {
+          window.scrollTo({ top: originalScrollY, behavior: 'auto' });
+          setTimeout(() => {
+            callback();
+            isScanningForArticles = false;
+          }, 300);
+        } else {
+          lastKnownScrollHeight = newScrollHeight;
+          scrollAndCheck();
+        }
+      }, 300);
+    };
+
+    scrollAndCheck();
+  }
+
+  /**
+   * Watches for changes in document height which indicates new content loaded
+   */
+  function watchForNewContent() {
+    if (scrollHeightCheckInterval) return; // Already watching
+    
+    scrollHeightCheckInterval = setInterval(() => {
+      const currentScrollHeight = Math.max(
+        document.body.scrollHeight,
+        document.documentElement.scrollHeight
+      );
+      
+      if (currentScrollHeight > lastKnownScrollHeight) {
+        lastKnownScrollHeight = currentScrollHeight;
+        // New content detected, refresh TOC
+        refreshTOC();
+      }
+    }, 2000); // Check every 2 seconds
   }
 
   /**
@@ -358,15 +653,39 @@
     const scrollArea = document.querySelector('.toc-scroll-area');
     const scrollTop = scrollArea ? scrollArea.scrollTop : 0;
 
-    const expandedId = null; // No longer needed
-    // const expandedParent = ... removed
-
+    // Update known scroll height
+    const currentScrollHeight = Math.max(
+      document.body.scrollHeight,
+      document.documentElement.scrollHeight
+    );
+    
     const structure = parseConversation();
-    renderSidebar(structure, { scrollTop });
+    
+    // If we found fewer articles than before, or if scroll height suggests more content,
+    // try scanning for more articles
+    if (structure.length < lastKnownArticleCount || 
+        (currentScrollHeight > lastKnownScrollHeight + 500 && structure.length < 50)) {
+      // Trigger background scan
+      scanForAllArticles(() => {
+        const newStructure = parseConversation();
+        if (newStructure.length > structure.length) {
+          const newScrollArea = document.querySelector('.toc-scroll-area');
+          const newScrollTop = newScrollArea ? newScrollArea.scrollTop : scrollTop;
+          renderSidebar(newStructure, { scrollTop: newScrollTop });
+          setTimeout(updateActiveSection, 100);
+        } else {
+          renderSidebar(structure, { scrollTop });
+          setTimeout(updateActiveSection, 100);
+        }
+        lastKnownArticleCount = Math.max(structure.length, newStructure.length);
+      });
+    } else {
+      renderSidebar(structure, { scrollTop });
+      setTimeout(updateActiveSection, 100);
+      lastKnownArticleCount = structure.length;
+    }
 
-    // Initial active check
-    setTimeout(updateActiveSection, 100);
-
+    lastKnownScrollHeight = currentScrollHeight;
   }
 
   // --- Initialization ---
@@ -376,13 +695,44 @@
     if (document.contentType && document.contentType !== 'text/html') return;
     if (!document.body) return;
 
+    // Initialize scroll height tracking
+    lastKnownScrollHeight = Math.max(
+      document.body.scrollHeight,
+      document.documentElement.scrollHeight
+    );
+
     // Initial Render
     refreshTOC();
 
+    // Do an initial scan after a short delay to catch lazy-loaded content
+    setTimeout(() => {
+      scanForAllArticles(() => {
+        refreshTOC();
+      });
+    }, 1500);
+
     // Watch for DOM changes
     observer = new MutationObserver((mutations) => {
-      clearTimeout(debounceTimer);
-      debounceTimer = setTimeout(refreshTOC, 1000);
+      // Check if any mutations involve article elements or user messages
+      const hasRelevantChanges = mutations.some(mutation => {
+        if (mutation.type === 'childList') {
+          for (const node of mutation.addedNodes) {
+            if (node.nodeType === Node.ELEMENT_NODE) {
+              if (node.tagName === 'ARTICLE' || 
+                  node.querySelector?.('article') ||
+                  node.querySelector?.('[data-message-author-role="user"]')) {
+                return true;
+              }
+            }
+          }
+        }
+        return false;
+      });
+      
+      if (hasRelevantChanges) {
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(refreshTOC, 500); // Faster refresh for relevant changes
+      }
     });
 
     observer.observe(document.body, {
@@ -391,6 +741,20 @@
       characterData: true,
       attributes: false
     });
+
+    // Also watch for scroll height changes (indicates lazy loading)
+    watchForNewContent();
+
+    // Watch for user scrolling to trigger refresh when they scroll down
+    let lastScrollY = window.scrollY;
+    window.addEventListener('scroll', () => {
+      const currentScrollY = window.scrollY;
+      // If user scrolled significantly down, refresh TOC to catch new content
+      if (currentScrollY > lastScrollY + 500) {
+        lastScrollY = currentScrollY;
+        setTimeout(refreshTOC, 1000);
+      }
+    }, { passive: true });
 
     console.log('ChatGPT TOC Extension initialized.');
   }
