@@ -290,7 +290,21 @@
    * Always recalculates container height to account for newly loaded content
    */
   function scrollToElement(element, id, retryCount = 0) {
-    if (!element) return;
+    // Always re-verify element exists and matches the ID by looking it up fresh
+    const foundElement = document.getElementById(id);
+    if (!foundElement) {
+      console.warn('TOC: Element not found for ID:', id);
+      return;
+    }
+    
+    // Use the freshly found element to ensure we have the current DOM reference
+    element = foundElement;
+    
+    // Double-check the element is valid and in the DOM
+    if (!element || !document.body.contains(element) || element.id !== id) {
+      console.warn('TOC: Element validation failed for ID:', id);
+      return;
+    }
 
     isManualScrolling = true;
     clearTimeout(scrollTimeout);
@@ -434,7 +448,41 @@
       link.innerText = section.title;
       link.dataset.target = section.id;
       link.onclick = (e) => {
-        scrollToElement(section.element, section.id);
+        e.preventDefault();
+        e.stopPropagation();
+        
+        const targetId = section.id;
+        
+        // Helper function to safely scroll to element
+        const attemptScroll = (attemptNumber) => {
+          // Always look up element fresh to ensure we have the current DOM element
+          const targetElement = document.getElementById(targetId);
+          if (!targetElement) {
+            console.warn(`TOC: Element not found for ID (attempt ${attemptNumber}):`, targetId);
+            return;
+          }
+          
+          // Verify the element is actually in the DOM and has the correct ID
+          if (!document.body.contains(targetElement) || targetElement.id !== targetId) {
+            console.warn(`TOC: Element validation failed (attempt ${attemptNumber}):`, targetId);
+            return;
+          }
+          
+          scrollToElement(targetElement, targetId);
+        };
+        
+        // First scroll attempt (immediate)
+        attemptScroll(1);
+        
+        // Second scroll attempt (after delay to allow content to load)
+        setTimeout(() => {
+          attemptScroll(2);
+        }, 400);
+        
+        // Third scroll attempt (after longer delay to ensure all content is loaded)
+        setTimeout(() => {
+          attemptScroll(3);
+        }, 800);
       };
 
       row.appendChild(link);
