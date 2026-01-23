@@ -128,14 +128,68 @@
       const sectionId = getStableArticleId(article, userMessageIndex);
       article.id = sectionId;
 
-      // Check if this is a follow-up message by looking for the specific ↳ visual treatment
-      // This icon is typically used in ChatGPT to indicate a branch or follow-up turn.
-      const isFollowUp = article.innerText.includes('↳') ||
-        article.querySelector('svg[data-testid="follow-up-icon"]') !== null ||
-        Array.from(article.querySelectorAll('svg')).some(svg =>
-          svg.innerHTML.includes('M11 19l9-7-9-7v14z') || // Right arrow path
-          svg.innerHTML.includes('M9 5l7 7-7 7') // Chevron path
-        );
+      // Check if this is a follow-up message by looking for follow-up indicators
+      // ChatGPT uses specific indicators for follow-up messages/branches
+      // We need to be precise - only mark as follow-up if we find clear evidence
+      let isFollowUp = false;
+
+      // Primary method: Check for the specific SVG sprite reference used by ChatGPT for follow-ups
+      // The sprite reference #e04414 is the follow-up icon - this is the most reliable indicator
+      const svgWithSprite = article.querySelector('svg use[href*="#e04414"]');
+      if (svgWithSprite) {
+        isFollowUp = true;
+      }
+
+      // If not found in article, check parent elements (sometimes icon is in wrapper)
+      if (!isFollowUp) {
+        let parent = article.parentElement;
+        let depth = 0;
+        while (parent && depth < 3 && parent !== document.body) {
+          const parentSprite = parent.querySelector('svg use[href*="#e04414"]');
+          if (parentSprite) {
+            // Verify the sprite is actually associated with this article
+            // Check if it's visually near the article (within reasonable distance)
+            const spriteRect = parentSprite.getBoundingClientRect();
+            const articleRect = article.getBoundingClientRect();
+            // If sprite is near the article (within 100px vertically), consider it a match
+            if (Math.abs(spriteRect.top - articleRect.top) < 100) {
+              isFollowUp = true;
+              break;
+            }
+          }
+          parent = parent.parentElement;
+          depth++;
+        }
+      }
+
+      // Secondary method: Check for follow-up icon SVG elements with specific data attributes
+      if (!isFollowUp) {
+        const followUpIcon = article.querySelector('svg[data-testid="follow-up-icon"]');
+        if (followUpIcon) {
+          isFollowUp = true;
+        }
+      }
+
+      // Tertiary method: Check for ↳ character, but only if it appears as a visual element
+      // (not just in the message text content)
+      if (!isFollowUp) {
+        // Look for ↳ in elements that are likely visual indicators, not message content
+        const visualElements = article.querySelectorAll('button, [role="button"], .icon, svg');
+        for (const el of visualElements) {
+          if (el.textContent && el.textContent.trim() === '↳') {
+            isFollowUp = true;
+            break;
+          }
+        }
+      }
+
+      // Last resort: Check for explicit data attributes (most reliable if present)
+      if (!isFollowUp) {
+        if (article.getAttribute('data-follow-up') === 'true' ||
+          article.getAttribute('data-branch') === 'true') {
+          isFollowUp = true;
+        }
+      }
 
       structure.push({
         id: sectionId,
@@ -370,7 +424,8 @@
       if (section.isFollowUp) {
         const arrow = document.createElement('span');
         arrow.className = 'toc-follow-up-icon';
-        arrow.innerText = '↳';
+        // Use the SVG icon for follow-up indicator
+        arrow.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" aria-hidden="true" data-rtl-flip="" class="icon"><use href="/cdn/assets/sprites-core-k5zux585.svg#e04414" fill="currentColor"></use></svg>';
         row.appendChild(arrow);
       }
 

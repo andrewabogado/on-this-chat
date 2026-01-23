@@ -64,6 +64,12 @@
   height: auto;
 }
 
+/* Indent follow-up items */
+.toc-item.follow-up {
+  padding-left: 20px;
+  /* Indent follow-up items to show hierarchy */
+}
+
 .toc-item {
   margin-bottom: 0px;
   position: relative;
@@ -75,6 +81,10 @@
   align-items: center;
   border-radius: 4px;
   padding: 2px 0;
+}
+
+.toc-item.follow-up>.toc-item-row {
+  margin-left: -20px;
 }
 
 .toc-item.user-message>.toc-item-row:hover {
@@ -140,15 +150,33 @@
 /* Follow-up Icon - Hanging bullet style */
 .toc-follow-up-icon {
   color: #9ca3af;
-  font-size: 12px;
   position: absolute;
   left: -14px;
-  top: 3px;
+  top: 6px;
+  /* Ensure it's visible and properly positioned */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1;
+  width: 12px;
+  height: 12px;
+}
+
+.toc-follow-up-icon svg {
+  width: 100%;
+  height: 100%;
+  color: inherit;
+}
+
+.toc-follow-up-icon svg use {
+  fill: currentColor;
 }
 
 /* Position row relatively for the hanging icon */
 .toc-item.follow-up>.toc-item-row {
   position: relative;
+  /* Add padding to accommodate the hanging bullet */
+  padding-left: 0;
 }
 
 /* Assistant Sub-headers (Nested) */
