@@ -290,6 +290,21 @@
    * Always recalculates container height to account for newly loaded content
    */
   function scrollToElement(element, id, retryCount = 0) {
+    // If preloading is not complete, wait for it before scrolling
+    if (!preloadComplete && isPreloading) {
+      console.log('TOC: Waiting for preload to complete before scrolling...');
+      const checkPreload = setInterval(() => {
+        if (preloadComplete || !isPreloading) {
+          clearInterval(checkPreload);
+          // Retry scroll after preload completes
+          setTimeout(() => {
+            scrollToElement(element, id, retryCount);
+          }, 100);
+        }
+      }, 100);
+      return;
+    }
+
     // Always re-verify element exists and matches the ID by looking it up fresh
     const foundElement = document.getElementById(id);
     if (!foundElement) {
@@ -502,7 +517,12 @@
         container.resizeObserver = null;
       }
     } else {
-      container.style.display = 'block';
+      // Only show TOC if preloading is complete
+      if (preloadComplete) {
+        container.style.display = 'block';
+      } else {
+        container.style.display = 'none';
+      }
 
       // Wrapper for scrolling
       const scrollArea = document.createElement('div');
@@ -929,10 +949,249 @@
   let scrollHeightCheckInterval = null;
   let isScanningForArticles = false;
   let isInitialLoad = true;
+  let isPreloading = false;
+  let preloadComplete = false;
+  let currentChatId = null;
+  let lastKnownUrl = window.location.href;
+
+  /**
+   * Comprehensive preloading function that ensures all chat content is loaded
+   * before allowing TOC operations. This prevents scrollTo from targeting wrong content.
+   * Uses a multi-pass approach: repeatedly checks top, middle, and bottom sections.
+   */
+  function preloadAllContent(callback) {
+    if (isScanningForArticles) {
+      // If already scanning, wait for it to complete
+      const checkInterval = setInterval(() => {
+        if (!isScanningForArticles) {
+          clearInterval(checkInterval);
+          callback();
+        }
+      }, 100);
+      return;
+    }
+
+    isScanningForArticles = true;
+    isPreloading = true;
+
+    const originalScrollY = window.scrollY;
+    let lastKnownHeight = 0;
+    let lastKnownArticleCount = 0;
+    const maxPasses = 3; // Do 3 complete passes
+    let currentPass = 0;
+
+    // Helper function to wait for content to stabilize at a position
+    function waitForStability(position, timeout = 2000) {
+      return new Promise((resolve) => {
+        let stableCount = 0;
+        const requiredStable = 2; // Need 2 consecutive stable checks
+        let lastHeight = 0;
+        let lastCount = 0;
+        let attempts = 0;
+        const maxAttempts = timeout / 200;
+
+        const check = () => {
+          attempts++;
+          const currentHeight = Math.max(
+            document.body.scrollHeight,
+            document.documentElement.scrollHeight
+          );
+          const articles = document.querySelectorAll('article[data-testid^="conversation-turn-"], article');
+          const currentCount = articles.length;
+
+          if (currentHeight === lastHeight && currentCount === lastCount) {
+            stableCount++;
+            if (stableCount >= requiredStable) {
+              resolve({ height: currentHeight, count: currentCount });
+              return;
+            }
+          } else {
+            stableCount = 0;
+          }
+
+          lastHeight = currentHeight;
+          lastCount = currentCount;
+
+          if (attempts >= maxAttempts) {
+            resolve({ height: currentHeight, count: currentCount });
+            return;
+          }
+
+          setTimeout(check, 200);
+        };
+
+        check();
+      });
+    }
+
+    // Helper function to scroll to a position and wait for content
+    function scrollToPositionAndWait(position, label) {
+      return new Promise((resolve) => {
+        window.scrollTo({ top: position, behavior: 'auto' });
+        
+        // Wait a bit for scroll to complete
+        setTimeout(() => {
+          // Wait for content to stabilize
+          waitForStability(position, 2000).then((result) => {
+            console.log(`TOC: Preload ${label} - Height: ${result.height}, Articles: ${result.count}`);
+            resolve(result);
+          });
+        }, 300);
+      });
+    }
+
+    // Main preload process
+    async function performPreloadPass() {
+      currentPass++;
+      console.log(`TOC: Starting preload pass ${currentPass}/${maxPasses}...`);
+
+      // Get current document height
+      let currentHeight = Math.max(
+        document.body.scrollHeight,
+        document.documentElement.scrollHeight
+      );
+      const maxScroll = Math.max(0, currentHeight - window.innerHeight);
+
+      // Pass 1: Check top, middle, bottom
+      await scrollToPositionAndWait(0, `Pass ${currentPass} - Top`);
+      
+      // Update height after top check
+      currentHeight = Math.max(
+        document.body.scrollHeight,
+        document.documentElement.scrollHeight
+      );
+      const newMaxScroll = Math.max(0, currentHeight - window.innerHeight);
+
+      // Check middle
+      const middlePosition = Math.floor(newMaxScroll / 2);
+      await scrollToPositionAndWait(middlePosition, `Pass ${currentPass} - Middle`);
+
+      // Update height after middle check
+      currentHeight = Math.max(
+        document.body.scrollHeight,
+        document.documentElement.scrollHeight
+      );
+      const finalMaxScroll = Math.max(0, currentHeight - window.innerHeight);
+
+      // Check bottom
+      await scrollToPositionAndWait(finalMaxScroll, `Pass ${currentPass} - Bottom`);
+
+      // Update height after bottom check
+      const finalHeight = Math.max(
+        document.body.scrollHeight,
+        document.documentElement.scrollHeight
+      );
+      const finalArticles = document.querySelectorAll('article[data-testid^="conversation-turn-"], article');
+      const finalCount = finalArticles.length;
+
+      // Check if we found new content in this pass
+      const foundNewContent = finalHeight > lastKnownHeight || finalCount > lastKnownArticleCount;
+      
+      lastKnownHeight = finalHeight;
+      lastKnownArticleCount = finalCount;
+
+      // If we found new content or haven't done all passes, do another pass
+      if (foundNewContent && currentPass < maxPasses) {
+        console.log(`TOC: Found new content (Height: ${finalHeight}, Articles: ${finalCount}), doing another pass...`);
+        // Small delay before next pass
+        setTimeout(() => {
+          performPreloadPass();
+        }, 500);
+      } else if (currentPass >= maxPasses) {
+        // Done with all passes, do final verification
+        console.log('TOC: All preload passes complete, verifying final state...');
+        
+        // Final comprehensive check: scroll through entire page one more time
+        const finalMaxScroll = Math.max(0, finalHeight - window.innerHeight);
+        const scrollStep = window.innerHeight * 1.5;
+        let scrollPos = 0;
+        let scrollAttempts = 0;
+        const maxScrollAttempts = Math.ceil(finalMaxScroll / scrollStep) + 3;
+
+        const finalScrollThrough = async () => {
+          if (scrollAttempts >= maxScrollAttempts) {
+            // Restore original scroll position
+            window.scrollTo({ top: originalScrollY, behavior: 'auto' });
+            
+            // Final stability check
+            await waitForStability(originalScrollY, 1500);
+            
+            const verifiedHeight = Math.max(
+              document.body.scrollHeight,
+              document.documentElement.scrollHeight
+            );
+            const verifiedArticles = document.querySelectorAll('article[data-testid^="conversation-turn-"], article');
+            
+            isScanningForArticles = false;
+            isPreloading = false;
+            preloadComplete = true;
+            lastKnownScrollHeight = verifiedHeight;
+            lastKnownArticleCount = verifiedArticles.length;
+            console.log(`TOC: Preloading complete. Final state - Height: ${verifiedHeight}, Articles: ${verifiedArticles.length}`);
+            callback();
+            return;
+          }
+
+          scrollPos = Math.min(scrollPos + scrollStep, finalMaxScroll);
+          window.scrollTo({ top: scrollPos, behavior: 'auto' });
+          scrollAttempts++;
+
+          // Wait for potential content load
+          await new Promise(resolve => setTimeout(resolve, 400));
+          
+          // Check if height increased
+          const newHeight = Math.max(
+            document.body.scrollHeight,
+            document.documentElement.scrollHeight
+          );
+          
+          if (newHeight > finalHeight) {
+            // New content found, update and continue
+            lastKnownHeight = newHeight;
+            const newMaxScroll = Math.max(0, newHeight - window.innerHeight);
+            if (scrollPos < newMaxScroll) {
+              finalScrollThrough();
+            } else {
+              // Reached end
+              window.scrollTo({ top: originalScrollY, behavior: 'auto' });
+              await waitForStability(originalScrollY, 1500);
+              isScanningForArticles = false;
+              isPreloading = false;
+              preloadComplete = true;
+              lastKnownScrollHeight = newHeight;
+              const finalArticles = document.querySelectorAll('article[data-testid^="conversation-turn-"], article');
+              lastKnownArticleCount = finalArticles.length;
+              console.log(`TOC: Preloading complete. Final state - Height: ${newHeight}, Articles: ${finalArticles.length}`);
+              callback();
+            }
+          } else {
+            // Continue scrolling
+            finalScrollThrough();
+          }
+        };
+
+        finalScrollThrough();
+      } else {
+        // No new content found, but we should still do all passes to be thorough
+        if (currentPass < maxPasses) {
+          setTimeout(() => {
+            performPreloadPass();
+          }, 500);
+        }
+      }
+    }
+
+    // Start the preload process
+    window.scrollTo({ top: 0, behavior: 'auto' });
+    setTimeout(() => {
+      performPreloadPass();
+    }, 500);
+  }
 
   /**
    * Attempts to trigger lazy loading by scrolling through the page incrementally
    * This is done in the background without disrupting user's current scroll position
+   * @deprecated - Use preloadAllContent for comprehensive preloading
    */
   function scanForAllArticles(callback) {
     if (isScanningForArticles) return;
@@ -1016,9 +1275,102 @@
   }
 
   /**
+   * Clears the TOC immediately and resets all state
+   */
+  function clearTOC() {
+    console.log('TOC: Clearing TOC...');
+    
+    // Hide and clear the container
+    const container = document.getElementById(SETTINGS.sidebarId);
+    if (container) {
+      container.style.display = 'none';
+      container.innerHTML = '';
+    }
+
+    // Reset all state
+    isPreloading = false;
+    preloadComplete = false;
+    isScanningForArticles = false;
+    isInitialLoad = true;
+    lastKnownScrollHeight = 0;
+    lastKnownArticleCount = 0;
+    currentChatId = null;
+    
+    // Clear any ongoing timeouts
+    if (scrollHeightCheckInterval) {
+      clearInterval(scrollHeightCheckInterval);
+      scrollHeightCheckInterval = null;
+    }
+    if (debounceTimer) {
+      clearTimeout(debounceTimer);
+      debounceTimer = null;
+    }
+    if (scrollTimeout) {
+      clearTimeout(scrollTimeout);
+      scrollTimeout = null;
+    }
+    if (tocScrollTimeout) {
+      clearTimeout(tocScrollTimeout);
+      tocScrollTimeout = null;
+    }
+    if (spyTimeout) {
+      clearTimeout(spyTimeout);
+      spyTimeout = null;
+    }
+  }
+
+  /**
+   * Detects if we're in a new chat or different chat thread
+   */
+  function detectChatChange() {
+    const currentUrl = window.location.href;
+    const urlChanged = currentUrl !== lastKnownUrl;
+    
+    // Extract chat ID from URL if possible (ChatGPT URLs often contain conversation IDs)
+    // For new chat, URL might be just /chat or /c/new
+    // For existing chat, URL might be /c/[id] or similar
+    let newChatId = null;
+    const urlMatch = currentUrl.match(/\/c\/([^\/\?]+)/);
+    if (urlMatch) {
+      newChatId = urlMatch[1];
+    } else if (currentUrl.includes('/chat') && !currentUrl.match(/\/c\//)) {
+      // Likely a new chat
+      newChatId = 'new';
+    }
+
+    // Check if chat ID changed
+    const chatIdChanged = newChatId !== currentChatId && currentChatId !== null;
+    
+    // Also check if content structure changed dramatically (indicating new chat)
+    const currentArticles = document.querySelectorAll('article[data-testid^="conversation-turn-"], article');
+    const currentArticleCount = currentArticles.length;
+    const structureChangedDramatically = currentArticleCount === 0 && lastKnownArticleCount > 0;
+
+    if (urlChanged || chatIdChanged || structureChangedDramatically) {
+      console.log('TOC: Chat change detected - URL:', urlChanged, 'Chat ID:', chatIdChanged, 'Structure:', structureChangedDramatically);
+      clearTOC();
+      lastKnownUrl = currentUrl;
+      currentChatId = newChatId;
+      return true;
+    }
+
+    lastKnownUrl = currentUrl;
+    if (newChatId !== null) {
+      currentChatId = newChatId;
+    }
+    
+    return false;
+  }
+
+  /**
    * Main refresh function.
    */
   function refreshTOC() {
+    // First check if we're in a new/different chat
+    if (detectChatChange()) {
+      // If chat changed, don't refresh - wait for new content
+      return;
+    }
     // Capture state to persist across re-renders
     const scrollArea = document.querySelector('.toc-scroll-area');
     // On initial load, don't restore scroll position - let it scroll to bottom
@@ -1066,34 +1418,171 @@
     if (document.contentType && document.contentType !== 'text/html') return;
     if (!document.body) return;
 
+    // Initialize URL and chat tracking
+    lastKnownUrl = window.location.href;
+    const urlMatch = window.location.href.match(/\/c\/([^\/\?]+)/);
+    if (urlMatch) {
+      currentChatId = urlMatch[1];
+    } else if (window.location.href.includes('/chat') && !window.location.href.match(/\/c\//)) {
+      currentChatId = 'new';
+    }
+
+    // Listen for URL changes (navigation events)
+    let lastUrl = window.location.href;
+    const checkUrlChange = () => {
+      const currentUrl = window.location.href;
+      if (currentUrl !== lastUrl) {
+        console.log('TOC: URL changed, clearing TOC...');
+        lastUrl = currentUrl;
+        clearTOC();
+        // Re-initialize after a short delay to allow new content to load
+        setTimeout(() => {
+          init();
+        }, 500);
+        return;
+      }
+    };
+
+    // Check URL changes periodically (only set up once)
+    if (!window.tocUrlCheckInterval) {
+      window.tocUrlCheckInterval = setInterval(checkUrlChange, 500);
+    }
+
+    // Also listen for popstate (back/forward navigation) - only add once
+    if (!window.tocPopstateListener) {
+      window.tocPopstateListener = () => {
+        setTimeout(() => {
+          if (window.location.href !== lastKnownUrl) {
+            console.log('TOC: Popstate navigation detected, clearing TOC...');
+            clearTOC();
+            // Re-initialize after a short delay
+            setTimeout(() => {
+              // Only re-init if not already initializing
+              if (!isPreloading && !preloadComplete) {
+                init();
+              }
+            }, 500);
+          }
+        }, 100);
+      };
+      window.addEventListener('popstate', window.tocPopstateListener);
+    }
+
+    // Override pushState and replaceState to detect programmatic navigation (only once)
+    if (!window.tocNavigationOverridden) {
+      const originalPushState = history.pushState;
+      const originalReplaceState = history.replaceState;
+      
+      history.pushState = function(...args) {
+        originalPushState.apply(history, args);
+        setTimeout(() => {
+          if (window.location.href !== lastKnownUrl) {
+            console.log('TOC: PushState navigation detected, clearing TOC...');
+            clearTOC();
+            setTimeout(() => {
+              if (!isPreloading && !preloadComplete) {
+                init();
+              }
+            }, 500);
+          }
+        }, 100);
+      };
+      
+      history.replaceState = function(...args) {
+        originalReplaceState.apply(history, args);
+        setTimeout(() => {
+          if (window.location.href !== lastKnownUrl) {
+            console.log('TOC: ReplaceState navigation detected, clearing TOC...');
+            clearTOC();
+            setTimeout(() => {
+              if (!isPreloading && !preloadComplete) {
+                init();
+              }
+            }, 500);
+          }
+        }, 100);
+      };
+      
+      window.tocNavigationOverridden = true;
+    }
+
     // Initialize scroll height tracking
     lastKnownScrollHeight = Math.max(
       document.body.scrollHeight,
       document.documentElement.scrollHeight
     );
 
-    // Initial Render
-    refreshTOC();
-
-    // Do an initial scan after a short delay to catch lazy-loaded content
-    setTimeout(() => {
-      scanForAllArticles(() => {
-        refreshTOC();
-        // Mark initial load as complete after first scan
-        isInitialLoad = false;
-      });
-    }, 1500);
-
-    // Mark initial load as complete after a delay (in case scan doesn't run)
-    setTimeout(() => {
+    // Start comprehensive preloading BEFORE showing TOC
+    console.log('TOC: Starting preload of all chat content...');
+    preloadAllContent(() => {
+      // After preload completes, render and show TOC
+      console.log('TOC: Preload complete, rendering TOC...');
+      refreshTOC();
       isInitialLoad = false;
-    }, 3000);
+      
+      // Ensure TOC is visible now that preload is complete
+      setTimeout(() => {
+        const container = document.getElementById(SETTINGS.sidebarId);
+        if (container) {
+          const structure = parseConversation();
+          if (structure.length > 0) {
+            container.style.display = 'block';
+          }
+        }
+      }, 100);
+    });
+
+    // Fallback: If preload takes too long, show TOC anyway after timeout
+    setTimeout(() => {
+      if (!preloadComplete) {
+        console.warn('TOC: Preload timeout, showing TOC with available content...');
+        preloadComplete = true;
+        isPreloading = false;
+        refreshTOC();
+        isInitialLoad = false;
+        const container = document.getElementById(SETTINGS.sidebarId);
+        if (container) {
+          container.style.display = 'block';
+        }
+      }
+    }, 10000); // 10 second timeout
 
     // Watch for DOM changes
     observer = new MutationObserver((mutations) => {
+      // First check if chat changed
+      if (detectChatChange()) {
+        // Chat changed, don't process mutations - wait for new init
+        return;
+      }
+
+      // Check if content was completely removed (indicating new chat)
+      const currentArticles = document.querySelectorAll('article[data-testid^="conversation-turn-"], article');
+      if (currentArticles.length === 0 && lastKnownArticleCount > 5) {
+        // All articles disappeared - likely new chat
+        console.log('TOC: All articles removed, likely new chat - clearing TOC...');
+        clearTOC();
+        return;
+      }
+
       // Check if any mutations involve article elements or user messages
       const hasRelevantChanges = mutations.some(mutation => {
         if (mutation.type === 'childList') {
+          // Check for removed nodes - if many articles removed, might be new chat
+          if (mutation.removedNodes.length > 0) {
+            for (const node of mutation.removedNodes) {
+              if (node.nodeType === Node.ELEMENT_NODE) {
+                if (node.tagName === 'ARTICLE' || node.querySelector?.('article')) {
+                  // Article removed - check if this is a major change
+                  const remainingArticles = document.querySelectorAll('article[data-testid^="conversation-turn-"], article');
+                  if (remainingArticles.length === 0) {
+                    return true; // All articles gone
+                  }
+                }
+              }
+            }
+          }
+          
+          // Check for added nodes
           for (const node of mutation.addedNodes) {
             if (node.nodeType === Node.ELEMENT_NODE) {
               if (node.tagName === 'ARTICLE' ||
@@ -1109,7 +1598,14 @@
 
       if (hasRelevantChanges) {
         clearTimeout(debounceTimer);
-        debounceTimer = setTimeout(refreshTOC, 500); // Faster refresh for relevant changes
+        // If preload is complete, refresh normally
+        // Otherwise, wait for preload to finish before refreshing
+        if (preloadComplete) {
+          debounceTimer = setTimeout(refreshTOC, 500); // Faster refresh for relevant changes
+        } else {
+          // During preload, don't refresh yet - let preload handle it
+          console.log('TOC: Content change detected during preload, will refresh after preload completes');
+        }
       }
     });
 
