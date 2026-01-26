@@ -977,18 +977,23 @@
     const originalScrollY = window.scrollY;
     let lastKnownHeight = 0;
     let lastKnownArticleCount = 0;
-    const maxPasses = 3; // Do 3 complete passes
+    
+    // Determine number of passes based on initial conversation count
+    const initialArticles = document.querySelectorAll('article[data-testid^="conversation-turn-"], article');
+    const initialCount = initialArticles.length;
+    // For shorter conversations (4-20), do 2 passes. For longer (20+), do 3 passes
+    const maxPasses = initialCount > 20 ? 3 : 2;
     let currentPass = 0;
 
     // Helper function to wait for content to stabilize at a position
-    function waitForStability(position, timeout = 2000) {
+    function waitForStability(position, timeout = 1500) {
       return new Promise((resolve) => {
         let stableCount = 0;
         const requiredStable = 2; // Need 2 consecutive stable checks
         let lastHeight = 0;
         let lastCount = 0;
         let attempts = 0;
-        const maxAttempts = timeout / 200;
+        const maxAttempts = timeout / 150; // Check every 150ms for faster response
 
         const check = () => {
           attempts++;
@@ -1017,7 +1022,7 @@
             return;
           }
 
-          setTimeout(check, 200);
+          setTimeout(check, 150); // Faster checking interval
         };
 
         check();
@@ -1029,14 +1034,14 @@
       return new Promise((resolve) => {
         window.scrollTo({ top: position, behavior: 'auto' });
         
-        // Wait a bit for scroll to complete
+        // Wait a bit for scroll to complete (reduced from 300ms to 200ms)
         setTimeout(() => {
-          // Wait for content to stabilize
-          waitForStability(position, 2000).then((result) => {
+          // Wait for content to stabilize (reduced timeout from 2000ms to 1500ms)
+          waitForStability(position, 1500).then((result) => {
             console.log(`TOC: Preload ${label} - Height: ${result.height}, Articles: ${result.count}`);
             resolve(result);
           });
-        }, 300);
+        }, 200);
       });
     }
 
@@ -1093,10 +1098,10 @@
       // If we found new content or haven't done all passes, do another pass
       if (foundNewContent && currentPass < maxPasses) {
         console.log(`TOC: Found new content (Height: ${finalHeight}, Articles: ${finalCount}), doing another pass...`);
-        // Small delay before next pass
+        // Small delay before next pass (reduced from 500ms to 300ms)
         setTimeout(() => {
           performPreloadPass();
-        }, 500);
+        }, 300);
       } else if (currentPass >= maxPasses) {
         // Done with all passes, do final verification
         console.log('TOC: All preload passes complete, verifying final state...');
@@ -1113,8 +1118,8 @@
             // Restore original scroll position
             window.scrollTo({ top: originalScrollY, behavior: 'auto' });
             
-            // Final stability check
-            await waitForStability(originalScrollY, 1500);
+            // Final stability check (reduced timeout)
+            await waitForStability(originalScrollY, 1000);
             
             const verifiedHeight = Math.max(
               document.body.scrollHeight,
@@ -1136,8 +1141,8 @@
           window.scrollTo({ top: scrollPos, behavior: 'auto' });
           scrollAttempts++;
 
-          // Wait for potential content load
-          await new Promise(resolve => setTimeout(resolve, 400));
+          // Wait for potential content load (reduced from 400ms to 300ms)
+          await new Promise(resolve => setTimeout(resolve, 300));
           
           // Check if height increased
           const newHeight = Math.max(
@@ -1154,7 +1159,7 @@
             } else {
               // Reached end
               window.scrollTo({ top: originalScrollY, behavior: 'auto' });
-              await waitForStability(originalScrollY, 1500);
+              await waitForStability(originalScrollY, 1000);
               isScanningForArticles = false;
               isPreloading = false;
               preloadComplete = true;
@@ -1171,14 +1176,27 @@
         };
 
         finalScrollThrough();
-      } else {
-        // No new content found, but we should still do all passes to be thorough
-        if (currentPass < maxPasses) {
-          setTimeout(() => {
-            performPreloadPass();
-          }, 500);
+        } else {
+          // No new content found, but we should still do all passes to be thorough
+          if (currentPass < maxPasses) {
+            setTimeout(() => {
+              performPreloadPass();
+            }, 300);
+          } else {
+            // All passes done, no new content found - complete preload
+            console.log('TOC: All preload passes complete, no new content found');
+            window.scrollTo({ top: originalScrollY, behavior: 'auto' });
+            setTimeout(() => {
+              isScanningForArticles = false;
+              isPreloading = false;
+              preloadComplete = true;
+              lastKnownScrollHeight = finalHeight;
+              lastKnownArticleCount = finalCount;
+              console.log(`TOC: Preloading complete. Final state - Height: ${finalHeight}, Articles: ${finalCount}`);
+              callback();
+            }, 500);
+          }
         }
-      }
     }
 
     // Start the preload process
@@ -1512,40 +1530,79 @@
       document.documentElement.scrollHeight
     );
 
-    // Start comprehensive preloading BEFORE showing TOC
-    console.log('TOC: Starting preload of all chat content...');
-    preloadAllContent(() => {
-      // After preload completes, render and show TOC
-      console.log('TOC: Preload complete, rendering TOC...');
+    // Check conversation count first - skip preload for short conversations
+    const initialStructure = parseConversation();
+    const conversationCount = initialStructure.length;
+    
+    console.log(`TOC: Found ${conversationCount} conversations`);
+
+    if (conversationCount <= 3) {
+      // Short conversation (1-3 items) - skip preload and show TOC immediately
+      console.log('TOC: Short conversation detected, skipping preload and showing TOC immediately');
+      preloadComplete = true; // Mark as complete so scrollTo works
+      isPreloading = false;
       refreshTOC();
       isInitialLoad = false;
       
-      // Ensure TOC is visible now that preload is complete
+      // Show TOC immediately
       setTimeout(() => {
         const container = document.getElementById(SETTINGS.sidebarId);
         if (container) {
-          const structure = parseConversation();
-          if (structure.length > 0) {
+          if (initialStructure.length > 0) {
             container.style.display = 'block';
           }
         }
       }, 100);
-    });
-
-    // Fallback: If preload takes too long, show TOC anyway after timeout
-    setTimeout(() => {
-      if (!preloadComplete) {
-        console.warn('TOC: Preload timeout, showing TOC with available content...');
-        preloadComplete = true;
-        isPreloading = false;
+    } else {
+      // Longer conversation - do comprehensive preloading
+      console.log('TOC: Longer conversation detected, starting preload of all chat content...');
+      
+      // Calculate timeout based on conversation count (more conversations = longer timeout)
+      // Base timeout: 5 seconds, plus 1 second per 10 conversations
+      const timeoutDuration = Math.min(20000, 5000 + Math.ceil(conversationCount / 10) * 1000);
+      
+      let timeoutId = null;
+      
+      preloadAllContent(() => {
+        // Clear timeout if preload completes successfully
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+          timeoutId = null;
+        }
+        
+        // After preload completes, render and show TOC
+        console.log('TOC: Preload complete, rendering TOC...');
         refreshTOC();
         isInitialLoad = false;
-        const container = document.getElementById(SETTINGS.sidebarId);
-        if (container) {
-          container.style.display = 'block';
+        
+        // Ensure TOC is visible now that preload is complete
+        setTimeout(() => {
+          const container = document.getElementById(SETTINGS.sidebarId);
+          if (container) {
+            const structure = parseConversation();
+            if (structure.length > 0) {
+              container.style.display = 'block';
+            }
+          }
+        }, 100);
+      });
+
+      // Fallback: If preload takes too long, show TOC anyway after timeout
+      timeoutId = setTimeout(() => {
+        if (!preloadComplete) {
+          console.log('TOC: Preload taking longer than expected, showing TOC with available content...');
+          preloadComplete = true;
+          isPreloading = false;
+          isScanningForArticles = false; // Stop any ongoing preload
+          refreshTOC();
+          isInitialLoad = false;
+          const container = document.getElementById(SETTINGS.sidebarId);
+          if (container) {
+            container.style.display = 'block';
+          }
         }
-      }
-    }, 10000); // 10 second timeout
+      }, timeoutDuration);
+    }
 
     // Watch for DOM changes
     observer = new MutationObserver((mutations) => {
