@@ -286,10 +286,130 @@
   }
 
   /**
+   * Creates an observer to detect scroll/content changes after initial scroll
+   * and re-triggers scroll if the position or content height changes
+   */
+  function createScrollAdjustmentObserver(targetId) {
+    // Clean up any existing observer
+    if (activeScrollObserver) {
+      activeScrollObserver.cleanup();
+      activeScrollObserver = null;
+    }
+    
+    currentScrollTargetId = targetId;
+    lastObservedScrollY = window.scrollY;
+    lastObservedContentHeight = document.body.scrollHeight;
+    
+    let scrollCheckCount = 0;
+    const maxChecks = 5; // Limit the number of re-scrolls to prevent infinite loops
+    let observerTimeout = null;
+    let isAdjusting = false;
+    
+    // Function to check if we need to re-scroll
+    const checkAndAdjust = () => {
+      if (isAdjusting || scrollCheckCount >= maxChecks) return;
+      
+      const currentScrollY = window.scrollY;
+      const currentContentHeight = document.body.scrollHeight;
+      
+      // Check if content height changed significantly (more than 50px)
+      // or if scroll position drifted significantly (more than 100px)
+      const heightChanged = Math.abs(currentContentHeight - lastObservedContentHeight) > 50;
+      const scrollDrifted = Math.abs(currentScrollY - lastObservedScrollY) > 100;
+      
+      if (heightChanged || scrollDrifted) {
+        isAdjusting = true;
+        scrollCheckCount++;
+        
+        console.log(`TOC: Detected change (height: ${heightChanged}, scroll: ${scrollDrifted}), re-scrolling (attempt ${scrollCheckCount})`);
+        
+        // Update tracking values
+        lastObservedContentHeight = currentContentHeight;
+        
+        // Re-scroll to target
+        const targetElement = document.getElementById(currentScrollTargetId);
+        if (targetElement && document.body.contains(targetElement)) {
+          scrollToElement(targetElement, currentScrollTargetId);
+          
+          // Update expected scroll position after a brief delay
+          setTimeout(() => {
+            lastObservedScrollY = window.scrollY;
+            lastObservedContentHeight = document.body.scrollHeight;
+            isAdjusting = false;
+          }, 150);
+        } else {
+          isAdjusting = false;
+        }
+      }
+    };
+    
+    // MutationObserver to detect DOM changes
+    const mutationObserver = new MutationObserver(() => {
+      if (!isAdjusting) {
+        // Debounce the check
+        clearTimeout(observerTimeout);
+        observerTimeout = setTimeout(checkAndAdjust, 100);
+      }
+    });
+    
+    // Observe the document body for child additions/removals and subtree changes
+    mutationObserver.observe(document.body, {
+      childList: true,
+      subtree: true,
+      attributes: false,
+      characterData: false
+    });
+    
+    // ResizeObserver to detect size changes in key containers
+    const resizeObserver = new ResizeObserver(() => {
+      if (!isAdjusting) {
+        clearTimeout(observerTimeout);
+        observerTimeout = setTimeout(checkAndAdjust, 100);
+      }
+    });
+    
+    // Observe the main content area
+    const mainContent = document.querySelector('main') || document.body;
+    resizeObserver.observe(mainContent);
+    
+    // Scroll event listener for external scroll changes
+    const scrollHandler = () => {
+      if (!isAdjusting && scrollCheckCount < maxChecks) {
+        clearTimeout(observerTimeout);
+        observerTimeout = setTimeout(checkAndAdjust, 150);
+      }
+    };
+    window.addEventListener('scroll', scrollHandler, { passive: true });
+    
+    // Cleanup function
+    const cleanup = () => {
+      mutationObserver.disconnect();
+      resizeObserver.disconnect();
+      window.removeEventListener('scroll', scrollHandler);
+      clearTimeout(observerTimeout);
+      currentScrollTargetId = null;
+    };
+    
+    // Auto-cleanup after 3 seconds (lazy loading should be done by then)
+    const autoCleanupTimeout = setTimeout(() => {
+      cleanup();
+      activeScrollObserver = null;
+    }, 3000);
+    
+    return {
+      cleanup: () => {
+        clearTimeout(autoCleanupTimeout);
+        cleanup();
+      }
+    };
+  }
+
+  /**
    * Helper to perform offset scrolling with retry for lazy-loaded content
    * Always recalculates container height to account for newly loaded content
+   * @param {Function} onComplete - Optional callback when scroll is complete
    */
-  function scrollToElement(element, id, retryCount = 0) {
+  function scrollToElement(element, id, retryCount = 0, onComplete = null) {
     // If preloading is not complete, wait for it before scrolling
     if (!preloadComplete && isPreloading) {
       console.log('TOC: Waiting for preload to complete before scrolling...');
@@ -392,10 +512,12 @@
 
             scrollTimeout = setTimeout(() => {
               isManualScrolling = false;
+              if (onComplete) onComplete();
             }, 50);
           } else {
             // Element is correctly positioned at the top
             isManualScrolling = false;
+            if (onComplete) onComplete();
           }
         }, 600); // Wait for smooth scroll animation
       }, isLoaded ? 200 : 400); // Wait longer to ensure content is fully loaded
@@ -468,36 +590,30 @@
         
         const targetId = section.id;
         
-        // Helper function to safely scroll to element
-        const attemptScroll = (attemptNumber) => {
-          // Always look up element fresh to ensure we have the current DOM element
-          const targetElement = document.getElementById(targetId);
-          if (!targetElement) {
-            console.warn(`TOC: Element not found for ID (attempt ${attemptNumber}):`, targetId);
-            return;
-          }
-          
-          // Verify the element is actually in the DOM and has the correct ID
-          if (!document.body.contains(targetElement) || targetElement.id !== targetId) {
-            console.warn(`TOC: Element validation failed (attempt ${attemptNumber}):`, targetId);
-            return;
-          }
-          
-          scrollToElement(targetElement, targetId);
-        };
+        // Look up element fresh to ensure we have the current DOM element
+        const targetElement = document.getElementById(targetId);
+        if (!targetElement) {
+          console.warn('TOC: Element not found for ID:', targetId);
+          return;
+        }
         
-        // First scroll attempt (immediate)
-        attemptScroll(1);
+        // Verify the element is actually in the DOM and has the correct ID
+        if (!document.body.contains(targetElement) || targetElement.id !== targetId) {
+          console.warn('TOC: Element validation failed:', targetId);
+          return;
+        }
         
-        // Second scroll attempt (after delay to allow content to load)
-        setTimeout(() => {
-          attemptScroll(2);
-        }, 400);
-        
-        // Third scroll attempt (after longer delay to ensure all content is loaded)
-        setTimeout(() => {
-          attemptScroll(3);
-        }, 800);
+        // Perform initial scroll, then do a second scroll when complete
+        // This ensures lazy-loaded content is accounted for
+        scrollToElement(targetElement, targetId, 0, () => {
+          // After first scroll completes, do another scroll to correct position
+          setTimeout(() => {
+            const freshElement = document.getElementById(targetId);
+            if (freshElement && document.body.contains(freshElement)) {
+              scrollToElement(freshElement, targetId);
+            }
+          }, 100);
+        });
       };
 
       row.appendChild(link);
@@ -953,6 +1069,12 @@
   let preloadComplete = false;
   let currentChatId = null;
   let lastKnownUrl = window.location.href;
+  
+  // Observer-based scroll adjustment tracking
+  let activeScrollObserver = null;
+  let lastObservedScrollY = 0;
+  let lastObservedContentHeight = 0;
+  let currentScrollTargetId = null;
 
   /**
    * Comprehensive preloading function that ensures all chat content is loaded
