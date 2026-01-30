@@ -4,6 +4,8 @@
   'use strict';
 
   // --- Configuration ---
+  const COMPACT_BREAKPOINT = 1280;
+
   const SETTINGS = {
     sidebarId: 'chatgpt-toc-sidebar',
     selectors: {
@@ -528,8 +530,14 @@
    * Renders the Sidebar HTML based on the parsed structure.
    * @param {Array} structure 
    */
+  function isCompactViewport() {
+    return window.innerWidth < COMPACT_BREAKPOINT;
+  }
+
   function renderSidebar(structure, restoredState = {}) {
     if (!document.body) return; // Safety check
+
+    const compact = isCompactViewport();
 
     // 1. Create or Clear Container
     let container = document.getElementById(SETTINGS.sidebarId);
@@ -540,6 +548,9 @@
     }
     // 2. Refresh Button
     container.innerHTML = ''; // Clear previous
+    if (container.classList.contains('toc-compact')) container.classList.remove('toc-compact');
+    if (container.classList.contains('toc-expanded')) container.classList.remove('toc-expanded');
+
     const headerDiv = document.createElement('div');
     headerDiv.style.display = 'flex';
     headerDiv.style.justifyContent = 'space-between';
@@ -547,6 +558,7 @@
     headerDiv.style.marginBottom = '8px'; // Reduced margin since no border
     headerDiv.style.borderBottom = 'none'; // Removed border
     headerDiv.style.paddingBottom = '0px';
+    if (compact) headerDiv.classList.add('toc-compact-header');
 
     const titleEl = document.createElement('h2');
     titleEl.innerText = 'On This Chat';
@@ -555,6 +567,7 @@
 
     headerDiv.appendChild(titleEl);
     container.appendChild(headerDiv);
+    if (compact) container.classList.add('toc-compact');
 
     // 3. Build List
     const list = document.createElement('ul');
@@ -638,6 +651,68 @@
         container.style.display = 'block';
       } else {
         container.style.display = 'none';
+      }
+
+      // Notion-style compact mode (below 1280px): dash rail + expand to full TOC
+      if (compact) {
+        const dashRail = document.createElement('div');
+        dashRail.className = 'toc-dash-rail';
+        dashRail.setAttribute('aria-label', 'Table of contents');
+        structure.forEach(section => {
+          const dash = document.createElement('button');
+          dash.type = 'button';
+          dash.className = 'toc-dash-item';
+          dash.dataset.target = section.id;
+          dash.setAttribute('aria-label', section.title);
+          dash.onclick = (e) => {
+            e.stopPropagation();
+            const targetId = section.id;
+            const targetElement = document.getElementById(targetId);
+            if (targetElement && document.body.contains(targetElement)) {
+              scrollToElement(targetElement, targetId, 0, () => {
+                setTimeout(() => {
+                  const el = document.getElementById(targetId);
+                  if (el && document.body.contains(el)) scrollToElement(el, targetId);
+                }, 100);
+              });
+              // Optionally collapse after tap on mobile
+              if (window.innerWidth < COMPACT_BREAKPOINT) {
+                setTimeout(() => container.classList.remove('toc-expanded'), 300);
+                const backdrop = document.querySelector('.toc-compact-backdrop');
+                if (backdrop) backdrop.classList.remove('visible');
+              }
+            }
+          };
+          dashRail.appendChild(dash);
+        });
+        // Toggle button to expand/collapse full TOC (Notion-style: tap to open full list)
+        const toggleBtn = document.createElement('button');
+        toggleBtn.type = 'button';
+        toggleBtn.className = 'toc-dash-rail-toggle';
+        toggleBtn.setAttribute('aria-label', 'Open table of contents');
+        toggleBtn.innerHTML = '⋯';
+        toggleBtn.onclick = (e) => {
+          e.stopPropagation();
+          container.classList.toggle('toc-expanded');
+          let backdrop = document.querySelector('.toc-compact-backdrop');
+          if (container.classList.contains('toc-expanded')) {
+            if (!backdrop) {
+              backdrop = document.createElement('div');
+              backdrop.className = 'toc-compact-backdrop';
+              backdrop.setAttribute('aria-hidden', 'true');
+              backdrop.onclick = () => {
+                container.classList.remove('toc-expanded');
+                backdrop.classList.remove('visible');
+              };
+              document.body.appendChild(backdrop);
+            }
+            backdrop.classList.add('visible');
+          } else if (backdrop) {
+            backdrop.classList.remove('visible');
+          }
+        };
+        dashRail.appendChild(toggleBtn);
+        container.appendChild(dashRail);
       }
 
       // Wrapper for scrolling
@@ -991,6 +1066,16 @@
     const link = document.querySelector(`.toc-link[data-target="${targetId}"]`);
     if (link) {
       link.classList.add('active');
+
+      // Sync active state to compact dash rail (Notion-style)
+      const dashItems = document.querySelectorAll('.toc-dash-item');
+      dashItems.forEach(dash => {
+        if (dash.dataset.target === targetId) {
+          dash.classList.add('active');
+        } else {
+          dash.classList.remove('active');
+        }
+      });
 
       // 2. Manage Active State (Simple)
 
@@ -1420,6 +1505,10 @@
   function clearTOC() {
     console.log('TOC: Clearing TOC...');
     
+    // Remove compact backdrop if present
+    const backdrop = document.querySelector('.toc-compact-backdrop');
+    if (backdrop && backdrop.parentNode) backdrop.parentNode.removeChild(backdrop);
+    
     // Hide and clear the container
     const container = document.getElementById(SETTINGS.sidebarId);
     if (container) {
@@ -1797,6 +1886,23 @@
 
     // Also watch for scroll height changes (indicates lazy loading)
     watchForNewContent();
+
+    // Re-render when crossing compact breakpoint (Notion-style TOC below 1280px)
+    let lastCompactState = isCompactViewport();
+    const resizeHandler = () => {
+      const nowCompact = isCompactViewport();
+      if (nowCompact !== lastCompactState) {
+        lastCompactState = nowCompact;
+        if (preloadComplete) {
+          const scrollArea = document.querySelector('.toc-scroll-area');
+          const scrollTop = scrollArea ? scrollArea.scrollTop : null;
+          const structure = parseConversation();
+          if (structure.length > 0) renderSidebar(structure, { scrollTop });
+          setTimeout(updateActiveSection, 50);
+        }
+      }
+    };
+    window.addEventListener('resize', resizeHandler);
 
     // Watch for user scrolling to trigger refresh when they scroll down
     let lastScrollY = window.scrollY;
