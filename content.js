@@ -653,7 +653,7 @@
         container.style.display = 'none';
       }
 
-      // Notion-style compact mode (below 1280px): dash rail + expand to full TOC
+      // Notion-style compact mode (below 1280px): dash rail + popover on hover
       if (compact) {
         const dashRail = document.createElement('div');
         dashRail.className = 'toc-dash-rail';
@@ -675,44 +675,77 @@
                   if (el && document.body.contains(el)) scrollToElement(el, targetId);
                 }, 100);
               });
-              // Optionally collapse after tap on mobile
-              if (window.innerWidth < COMPACT_BREAKPOINT) {
-                setTimeout(() => container.classList.remove('toc-expanded'), 300);
-                const backdrop = document.querySelector('.toc-compact-backdrop');
-                if (backdrop) backdrop.classList.remove('visible');
-              }
             }
           };
           dashRail.appendChild(dash);
         });
-        // Toggle button to expand/collapse full TOC (Notion-style: tap to open full list)
-        const toggleBtn = document.createElement('button');
-        toggleBtn.type = 'button';
-        toggleBtn.className = 'toc-dash-rail-toggle';
-        toggleBtn.setAttribute('aria-label', 'Open table of contents');
-        toggleBtn.innerHTML = '⋯';
-        toggleBtn.onclick = (e) => {
-          e.stopPropagation();
-          container.classList.toggle('toc-expanded');
-          let backdrop = document.querySelector('.toc-compact-backdrop');
-          if (container.classList.contains('toc-expanded')) {
-            if (!backdrop) {
-              backdrop = document.createElement('div');
-              backdrop.className = 'toc-compact-backdrop';
-              backdrop.setAttribute('aria-hidden', 'true');
-              backdrop.onclick = () => {
-                container.classList.remove('toc-expanded');
-                backdrop.classList.remove('visible');
-              };
-              document.body.appendChild(backdrop);
-            }
-            backdrop.classList.add('visible');
-          } else if (backdrop) {
-            backdrop.classList.remove('visible');
-          }
-        };
-        dashRail.appendChild(toggleBtn);
         container.appendChild(dashRail);
+
+        // Popover with full list of contents (shown when hovering any dot)
+        const popover = document.createElement('div');
+        popover.className = 'toc-popover';
+        popover.setAttribute('role', 'dialog');
+        popover.setAttribute('aria-label', 'Table of contents');
+        const popoverHeader = document.createElement('div');
+        popoverHeader.className = 'toc-popover-header';
+        popoverHeader.textContent = 'On This Chat';
+        const popoverListWrap = document.createElement('div');
+        popoverListWrap.className = 'toc-popover-list-wrap';
+        const listClone = list.cloneNode(true);
+        listClone.classList.add('toc-popover-list');
+        popoverListWrap.appendChild(listClone);
+        popover.appendChild(popoverHeader);
+        popover.appendChild(popoverListWrap);
+        container.appendChild(popover);
+
+        // Click in popover: scroll to section (cloned links have same data-target)
+        popover.addEventListener('click', (e) => {
+          const link = e.target.closest('.toc-link');
+          if (!link || !link.dataset.target) return;
+          e.preventDefault();
+          e.stopPropagation();
+          const targetId = link.dataset.target;
+          const targetElement = document.getElementById(targetId);
+          if (targetElement && document.body.contains(targetElement)) {
+            scrollToElement(targetElement, targetId, 0, () => {
+              setTimeout(() => {
+                const el = document.getElementById(targetId);
+                if (el && document.body.contains(el)) scrollToElement(el, targetId);
+              }, 100);
+            });
+          }
+        });
+
+        // Show popover on hover over rail, hide when mouse leaves both rail and popover
+        let showPopoverTimer = null;
+        let hidePopoverTimer = null;
+        const showPopover = () => {
+          clearTimeout(hidePopoverTimer);
+          popover.classList.add('visible');
+        };
+        const hidePopover = () => {
+          popover.classList.remove('visible');
+        };
+        dashRail.addEventListener('mouseenter', () => {
+          clearTimeout(hidePopoverTimer);
+          showPopoverTimer = setTimeout(showPopover, 80);
+        });
+        dashRail.addEventListener('mouseleave', (e) => {
+          clearTimeout(showPopoverTimer);
+          if (!popover.contains(e.relatedTarget)) {
+            hidePopoverTimer = setTimeout(hidePopover, 120);
+          }
+        });
+        popover.addEventListener('mouseenter', () => {
+          clearTimeout(hidePopoverTimer);
+          clearTimeout(showPopoverTimer);
+          showPopover();
+        });
+        popover.addEventListener('mouseleave', (e) => {
+          if (!dashRail.contains(e.relatedTarget)) {
+            hidePopoverTimer = setTimeout(hidePopover, 120);
+          }
+        });
       }
 
       // Wrapper for scrolling
@@ -1059,24 +1092,25 @@
     const previousActive = document.querySelector('.toc-link.active');
     if (previousActive && previousActive.dataset.target === targetId) return;
 
-    // Remove current active
-    if (previousActive) previousActive.classList.remove('active');
+    // Remove current active from all TOC links (sidebar + popover)
+    document.querySelectorAll('.toc-link.active').forEach(l => l.classList.remove('active'));
 
-    // 1. Find the target link
-    const link = document.querySelector(`.toc-link[data-target="${targetId}"]`);
+    // 1. Find the target link(s) and set active (sidebar + popover)
+    const links = document.querySelectorAll(`.toc-link[data-target="${targetId}"]`);
+    const link = links.length > 0 ? links[0] : null;
+    links.forEach(l => l.classList.add('active'));
+
+    // Sync active state to compact dash rail (Notion-style)
+    const dashItems = document.querySelectorAll('.toc-dash-item');
+    dashItems.forEach(dash => {
+      if (dash.dataset.target === targetId) {
+        dash.classList.add('active');
+      } else {
+        dash.classList.remove('active');
+      }
+    });
+
     if (link) {
-      link.classList.add('active');
-
-      // Sync active state to compact dash rail (Notion-style)
-      const dashItems = document.querySelectorAll('.toc-dash-item');
-      dashItems.forEach(dash => {
-        if (dash.dataset.target === targetId) {
-          dash.classList.add('active');
-        } else {
-          dash.classList.remove('active');
-        }
-      });
-
       // 2. Manage Active State (Simple)
 
       // Auto-scroll sidebar logic: Scroll the TOC scroll area to keep active link visible
