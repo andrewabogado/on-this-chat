@@ -376,7 +376,24 @@
     overflow: hidden;
   }
 
-  /* Fade overlays fixed to top/bottom of wrap (do not scroll) */
+  /* Fade overlays: only visible when content is scrollable; top/bottom by scroll position */
+  .toc-popover-list-wrap::before,
+  .toc-popover-list-wrap::after {
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.2s ease, visibility 0.2s ease;
+  }
+
+  .toc-popover-list-wrap:not(.not-scrollable).top-fade-visible::before {
+    opacity: 1;
+    visibility: visible;
+  }
+
+  .toc-popover-list-wrap:not(.not-scrollable).bottom-fade-visible::after {
+    opacity: 1;
+    visibility: visible;
+  }
+
   .toc-popover-list-wrap::before {
     content: '';
     position: absolute;

@@ -701,6 +701,35 @@
         popover.appendChild(popoverListWrap);
         container.appendChild(popover);
 
+        // Only show fade overlays when content is scrollable; toggle top/bottom by scroll position
+        const updatePopoverFades = () => {
+          const scrollTop = popoverListScroll.scrollTop;
+          const scrollHeight = popoverListScroll.scrollHeight;
+          const clientHeight = popoverListScroll.clientHeight;
+          const isScrollable = scrollHeight > clientHeight + 2;
+          if (!isScrollable) {
+            popoverListWrap.classList.add('not-scrollable');
+            popoverListWrap.classList.remove('top-fade-visible', 'bottom-fade-visible');
+            return;
+          }
+          popoverListWrap.classList.remove('not-scrollable');
+          if (scrollTop > 5) {
+            popoverListWrap.classList.add('top-fade-visible');
+          } else {
+            popoverListWrap.classList.remove('top-fade-visible');
+          }
+          const isAtBottom = Math.ceil(scrollTop + clientHeight) >= scrollHeight - 5;
+          if (isAtBottom) {
+            popoverListWrap.classList.remove('bottom-fade-visible');
+          } else {
+            popoverListWrap.classList.add('bottom-fade-visible');
+          }
+        };
+        popoverListScroll.addEventListener('scroll', updatePopoverFades);
+        const popoverResizeObserver = new ResizeObserver(updatePopoverFades);
+        popoverResizeObserver.observe(popoverListScroll);
+        requestAnimationFrame(updatePopoverFades);
+
         // Click in popover: scroll to section (cloned links have same data-target)
         popover.addEventListener('click', (e) => {
           const link = e.target.closest('.toc-link');
