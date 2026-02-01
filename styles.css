@@ -267,8 +267,8 @@
   visibility: visible;
 }
 
-/* ========== Notion-style compact TOC (below 1280px) ========== */
-@media (max-width: 1279px) {
+/* ========== Notion-style compact TOC (below 1659px) ========== */
+@media (max-width: 1659px) {
   /* Collapsed: narrow rail with dashes (one per section) on the right */
   #chatgpt-toc-sidebar.toc-compact {
     top: 50%;

@@ -4,7 +4,7 @@
   'use strict';
 
   // --- Configuration ---
-  const COMPACT_BREAKPOINT = 1280;
+  const COMPACT_BREAKPOINT = 1660;
 
   const SETTINGS = {
     sidebarId: 'chatgpt-toc-sidebar',
@@ -653,7 +653,7 @@
         container.style.display = 'none';
       }
 
-      // Notion-style compact mode (below 1280px): dash rail + popover on hover
+      // Notion-style compact mode (below 1660px): dash rail + popover on hover
       if (compact) {
         const dashRail = document.createElement('div');
         dashRail.className = 'toc-dash-rail';
@@ -1921,7 +1921,7 @@
     // Also watch for scroll height changes (indicates lazy loading)
     watchForNewContent();
 
-    // Re-render when crossing compact breakpoint (Notion-style TOC below 1280px)
+    // Re-render when crossing compact breakpoint (Notion-style TOC below 1660px)
     let lastCompactState = isCompactViewport();
     const resizeHandler = () => {
       const nowCompact = isCompactViewport();
