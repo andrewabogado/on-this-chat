@@ -691,9 +691,12 @@
         popoverHeader.textContent = 'On This Chat';
         const popoverListWrap = document.createElement('div');
         popoverListWrap.className = 'toc-popover-list-wrap';
+        const popoverListScroll = document.createElement('div');
+        popoverListScroll.className = 'toc-popover-list-scroll';
         const listClone = list.cloneNode(true);
         listClone.classList.add('toc-popover-list');
-        popoverListWrap.appendChild(listClone);
+        popoverListScroll.appendChild(listClone);
+        popoverListWrap.appendChild(popoverListScroll);
         popover.appendChild(popoverHeader);
         popover.appendChild(popoverListWrap);
         container.appendChild(popover);
