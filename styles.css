@@ -297,33 +297,52 @@
     display: none !important;
   }
 
-  /* Dash rail: vertical list of clickable dashes */
+  /* Dash rail: thin light gray vertical line with horizontal dash markers (reference: doc TOC rail) */
   .toc-dash-rail {
     display: flex;
     flex-direction: column;
-    align-items: center;
-    gap: 4px;
+    align-items: flex-end;
+    gap: 6px;
     cursor: pointer;
-    padding: 4px 0;
+    padding: 8px 0;
+    position: relative;
+  }
+
+  /* Subtle vertical rail line */
+  .toc-dash-rail::before {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 0;
+    bottom: 0;
+    width: 1px;
+    /* background: #DADCE0; */
+    transform: translateX(-50%);
+    z-index: 0;
   }
 
   .toc-dash-item {
-    width: 4px;
-    height: 4px;
-    border-radius: 2px;
-    background: rgba(0, 0, 0, 0.2);
-    transition: background 0.15s ease, transform 0.15s ease;
+    width: 8px;
+    height: 2px;
+    border-radius: 1px;
+    background: #DADCE0;
+    transition: background 0.15s ease, height 0.15s ease, width 0.15s ease;
     flex-shrink: 0;
+    position: relative;
+    z-index: 1;
+    border: none;
   }
 
   .toc-dash-item:hover {
-    background: rgba(0, 0, 0, 0.4);
-    transform: scale(1.2);
+    background: #3C4043;
+    height: 2px;
   }
 
+  /* Active: thicker, darker, filled-in rectangle (reference: highlighted section indicator) */
   .toc-dash-item.active {
-    background: #000000;
-    transform: scale(1.3);
+    background: #3C4043;
+    width: 12px;
+    border-radius: 2px;
   }
 
   /* Popover: full list of contents on hover over any dot */
