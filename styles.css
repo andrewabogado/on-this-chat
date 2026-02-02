@@ -38,6 +38,12 @@
   display: none;
 }
 
+/* Hide TOC when a modal or lightbox is open */
+#chatgpt-toc-sidebar.toc-hidden-by-modal {
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
 /* Header */
 #chatgpt-toc-sidebar h2 {
   font-size: 12px;

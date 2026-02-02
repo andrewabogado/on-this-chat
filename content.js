@@ -649,6 +649,7 @@
       // Only show TOC if preloading is complete
       if (preloadComplete) {
         container.style.display = 'block';
+        updateTOCVisibilityForModal();
       } else {
         container.style.display = 'none';
       }
@@ -1618,6 +1619,56 @@
   }
 
   /**
+   * Detects if a modal or lightbox is currently open (so we can hide the TOC).
+   */
+  function isModalOrLightboxOpen() {
+    // Standard dialog / modal roles
+    const dialogs = document.querySelectorAll('[role="dialog"], [role="alertdialog"], [aria-modal="true"]');
+    for (const el of dialogs) {
+      if (el.nodeType === Node.ELEMENT_NODE && isVisibleAndLarge(el)) return true;
+    }
+    // Common overlay / modal / lightbox class patterns
+    const overlaySelectors = [
+      '[class*="modal"]', '[class*="lightbox"]', '[class*="overlay"]',
+      '[class*="backdrop"]', '[class*="dialog"]', '[class*="popover"]'
+    ];
+    for (const sel of overlaySelectors) {
+      try {
+        const nodes = document.querySelectorAll(sel);
+        for (const el of nodes) {
+          if (el.id === SETTINGS.sidebarId || el.closest('#' + SETTINGS.sidebarId)) continue;
+          if (isVisibleAndLarge(el)) return true;
+        }
+      } catch (_) { /* ignore invalid selector */ }
+    }
+    return false;
+  }
+
+  function isVisibleAndLarge(el) {
+    if (!el || el.nodeType !== Node.ELEMENT_NODE) return false;
+    const rect = el.getBoundingClientRect();
+    const style = window.getComputedStyle(el);
+    if (style.visibility === 'hidden' || style.display === 'none' || style.opacity === '0') return false;
+    const minArea = (window.innerWidth * window.innerHeight) * 0.2;
+    return rect.width * rect.height >= minArea;
+  }
+
+  let lastModalState = false;
+
+  function updateTOCVisibilityForModal() {
+    const container = document.getElementById(SETTINGS.sidebarId);
+    if (!container) return;
+    const modalOpen = isModalOrLightboxOpen();
+    if (modalOpen === lastModalState) return;
+    lastModalState = modalOpen;
+    if (modalOpen) {
+      container.classList.add('toc-hidden-by-modal');
+    } else {
+      container.classList.remove('toc-hidden-by-modal');
+    }
+  }
+
+  /**
    * Detects if we're in a new chat or different chat thread
    */
   function detectChatChange() {
@@ -1830,6 +1881,7 @@
         if (container) {
           if (initialStructure.length > 0) {
             container.style.display = 'block';
+            updateTOCVisibilityForModal();
           }
         }
       }, 100);
@@ -1862,6 +1914,7 @@
             const structure = parseConversation();
             if (structure.length > 0) {
               container.style.display = 'block';
+              updateTOCVisibilityForModal();
             }
           }
         }, 100);
@@ -1879,6 +1932,7 @@
           const container = document.getElementById(SETTINGS.sidebarId);
           if (container) {
             container.style.display = 'block';
+            updateTOCVisibilityForModal();
           }
         }
       }, timeoutDuration);
@@ -1983,6 +2037,19 @@
         setTimeout(refreshTOC, 1000);
       }
     }, { passive: true });
+
+    // Hide TOC when a modal or lightbox is open
+    let modalCheckScheduled = null;
+    const scheduleModalCheck = () => {
+      if (modalCheckScheduled) return;
+      modalCheckScheduled = requestAnimationFrame(() => {
+        modalCheckScheduled = null;
+        updateTOCVisibilityForModal();
+      });
+    };
+    const modalObserver = new MutationObserver(() => scheduleModalCheck());
+    modalObserver.observe(document.body, { childList: true, subtree: true });
+    scheduleModalCheck();
 
     console.log('ChatGPT TOC Extension initialized.');
   }
