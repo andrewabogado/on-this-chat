@@ -382,6 +382,7 @@
     opacity: 1;
     visibility: visible;
     pointer-events: auto;
+    margin-top: -24px;
   }
 
   .toc-popover-header {
@@ -484,7 +485,7 @@
 /* ========== Dark mode (system preference) ========== */
 @media (prefers-color-scheme: dark) {
   #chatgpt-toc-sidebar {
-    background: rgba(28, 28, 30, 0.88);
+    background: #212121;
     color: #a1a1aa;
   }
 
@@ -526,28 +527,18 @@
   }
 
   .toc-fade-overlay {
-    background: linear-gradient(
-      to bottom,
-      rgba(28, 28, 30, 0) 0%,
-      rgba(28, 28, 30, 0.9) 60%,
-      rgba(28, 28, 30, 1) 100%
-    );
+    background: linear-gradient(to bottom, transparent 0%, #212121 60%, #212121 100%);
   }
 
   .toc-fade-overlay-top {
-    background: linear-gradient(
-      to bottom,
-      rgba(28, 28, 30, 1) 0%,
-      rgba(28, 28, 30, 0.9) 30%,
-      rgba(28, 28, 30, 0) 100%
-    );
+    background:linear-gradient(to top, transparent 0%, #212121 60%, #212121 100%)
   }
 
   /* Compact / dash rail dark mode */
   @media (max-width: 1659px) {
-    .toc-dash-rail::before {
+    /* .toc-dash-rail::before {
       background: #3f3f46;
-    }
+    } */
 
     .toc-dash-item {
       background: #52525b;
@@ -564,7 +555,8 @@
 
     .toc-popover {
       color: #e4e4e7;
-      background-color: rgb(24, 24, 27);
+      /* background-color: rgb(24, 24, 27); */
+      background-color: #181818;
       border-color: rgba(255, 255, 255, 0.06);
       box-shadow: rgba(0, 0, 0, 0.4) 0 8px 12px 0,
         rgba(255, 255, 255, 0.08) 0 0 1px 0;
