@@ -480,3 +480,129 @@
     top: 6px;
   }
 }
+
+/* ========== Dark mode (system preference) ========== */
+@media (prefers-color-scheme: dark) {
+  #chatgpt-toc-sidebar {
+    background: rgba(28, 28, 30, 0.88);
+    color: #a1a1aa;
+  }
+
+  #chatgpt-toc-sidebar h2 {
+    color: #a1a1aa;
+  }
+
+  .toc-link {
+    color: #a1a1aa;
+  }
+
+  .toc-link:hover {
+    color: #fafafa;
+  }
+
+  .toc-link.active {
+    color: #fafafa;
+  }
+
+  .toc-item.user-message > .toc-item-row > .toc-link {
+    color: #a1a1aa;
+  }
+
+  .toc-item.user-message > .toc-item-row > .toc-link:hover,
+  .toc-item.user-message > .toc-item-row > .toc-link.active {
+    color: #fafafa;
+  }
+
+  .toc-follow-up-icon {
+    color: #71717a;
+  }
+
+  #chatgpt-toc-sidebar::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.15);
+  }
+
+  #chatgpt-toc-sidebar::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.25);
+  }
+
+  .toc-fade-overlay {
+    background: linear-gradient(
+      to bottom,
+      rgba(28, 28, 30, 0) 0%,
+      rgba(28, 28, 30, 0.9) 60%,
+      rgba(28, 28, 30, 1) 100%
+    );
+  }
+
+  .toc-fade-overlay-top {
+    background: linear-gradient(
+      to bottom,
+      rgba(28, 28, 30, 1) 0%,
+      rgba(28, 28, 30, 0.9) 30%,
+      rgba(28, 28, 30, 0) 100%
+    );
+  }
+
+  /* Compact / dash rail dark mode */
+  @media (max-width: 1659px) {
+    .toc-dash-rail::before {
+      background: #3f3f46;
+    }
+
+    .toc-dash-item {
+      background: #52525b;
+    }
+
+    .toc-dash-item:hover {
+      background: #d4d4d8;
+    }
+
+    .toc-dash-item.active {
+      background: #e4e4e7;
+      width: 12px;
+    }
+
+    .toc-popover {
+      color: #e4e4e7;
+      background-color: rgb(24, 24, 27);
+      border-color: rgba(255, 255, 255, 0.06);
+      box-shadow: rgba(0, 0, 0, 0.4) 0 8px 12px 0,
+        rgba(255, 255, 255, 0.08) 0 0 1px 0;
+    }
+
+    .toc-popover-header {
+      color: #a1a1aa;
+    }
+
+    .toc-popover-list-wrap::before {
+      background: linear-gradient(
+        to bottom,
+        rgb(24, 24, 27) 0%,
+        rgba(24, 24, 27, 0.9) 30%,
+        rgba(24, 24, 27, 0) 100%
+      );
+    }
+
+    .toc-popover-list-wrap::after {
+      background: linear-gradient(
+        to bottom,
+        rgba(24, 24, 27, 0) 0%,
+        rgba(24, 24, 27, 0.9) 60%,
+        rgb(24, 24, 27) 100%
+      );
+    }
+
+    .toc-popover-list-scroll::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.2);
+    }
+
+    .toc-popover .toc-link {
+      color: #a1a1aa;
+    }
+
+    .toc-popover .toc-link:hover,
+    .toc-popover .toc-link.active {
+      color: #fafafa;
+    }
+  }
+}
