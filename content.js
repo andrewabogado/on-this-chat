@@ -1146,11 +1146,14 @@
       // 2. Manage Active State (Simple)
 
       // Auto-scroll sidebar logic: Scroll the TOC scroll area to keep active link visible
+      // Use the link inside the sidebar scroll area (not the popover clone) for correct coordinates
       if (!skipScroll && !isManualTOCScrolling) {
         const scrollArea = document.querySelector('.toc-scroll-area');
-        if (scrollArea && link) {
+        const sidebarLink = scrollArea ? scrollArea.querySelector(`.toc-link[data-target="${targetId}"]`) : null;
+        // Only scroll when sidebar list is visible (e.g. not in compact popover-only mode)
+        if (scrollArea && sidebarLink && scrollArea.clientHeight > 0) {
           // Use getBoundingClientRect for accurate positioning
-          const linkRect = link.getBoundingClientRect();
+          const linkRect = sidebarLink.getBoundingClientRect();
           const scrollAreaRect = scrollArea.getBoundingClientRect();
 
           // Calculate link position relative to scroll area viewport
