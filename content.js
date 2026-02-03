@@ -21,6 +21,10 @@
     }
   };
 
+  /** ChatGPT Activity sidebar (multitasking) – has .bg-token-sidebar-surface-primary and inline width */
+  const CHATGPT_ACTIVITY_SIDEBAR_SELECTOR = '.bg-token-sidebar-surface-primary';
+  const TOC_RIGHT_GAP_PX = 16;
+
   let observer = null;
 
   let debounceTimer = null;
@@ -534,6 +538,58 @@
     return window.innerWidth < COMPACT_BREAKPOINT;
   }
 
+  /** Viewport thresholds for treating .bg-token-sidebar-surface-primary as the right Activity sidebar */
+  const ACTIVITY_SIDEBAR_RIGHT_EDGE_TOLERANCE = 80;
+  const ACTIVITY_SIDEBAR_MAX_WIDTH = 500;
+
+  /**
+   * Returns the right-side ChatGPT Activity sidebar element, or null. Only elements that are
+   * actually on the right (multitasking/Activity panel) are returned; center/left panels with
+   * the same class are ignored.
+   */
+  function getChatGPTActivitySidebarElement() {
+    const candidates = document.querySelectorAll(CHATGPT_ACTIVITY_SIDEBAR_SELECTOR);
+    const viewportRight = window.innerWidth;
+    const viewportCenter = viewportRight * 0.5;
+
+    for (const el of candidates) {
+      if (!el || el.nodeType !== Node.ELEMENT_NODE) continue;
+      const style = window.getComputedStyle(el);
+      if (style.visibility === 'hidden' || style.display === 'none' || style.opacity === '0') continue;
+      const rect = el.getBoundingClientRect();
+      if (rect.width <= 0 || rect.height <= 0) continue;
+      const isRightSidebar = rect.right >= viewportRight - ACTIVITY_SIDEBAR_RIGHT_EDGE_TOLERANCE && rect.left >= viewportCenter;
+      const isNarrowEnough = rect.width <= ACTIVITY_SIDEBAR_MAX_WIDTH;
+      if (isRightSidebar && isNarrowEnough) return el;
+    }
+    return null;
+  }
+
+  /**
+   * Returns the width in px of the right-side Activity sidebar, or 0 if none (or only center/left panels).
+   */
+  function getChatGPTActivitySidebarWidth() {
+    const el = getChatGPTActivitySidebarElement();
+    if (!el) return 0;
+    return el.getBoundingClientRect().width;
+  }
+
+  /**
+   * Sets the TOC container's right offset so it sits to the left of the ChatGPT Activity
+   * sidebar when that sidebar is visible. Removes inline right when the Activity sidebar
+   * is absent so CSS defaults (20px / 16px compact) apply.
+   */
+  function applyTOCRightForSidebar() {
+    const container = document.getElementById(SETTINGS.sidebarId);
+    if (!container) return;
+    const sidebarWidth = getChatGPTActivitySidebarWidth();
+    if (sidebarWidth > 0) {
+      container.style.right = `${sidebarWidth + TOC_RIGHT_GAP_PX}px`;
+    } else {
+      container.style.removeProperty('right');
+    }
+  }
+
   function renderSidebar(structure, restoredState = {}) {
     if (!document.body) return; // Safety check
 
@@ -650,6 +706,7 @@
       if (preloadComplete) {
         container.style.display = 'block';
         updateTOCVisibilityForModal();
+        applyTOCRightForSidebar();
       } else {
         container.style.display = 'none';
       }
@@ -2050,6 +2107,35 @@
     const modalObserver = new MutationObserver(() => scheduleModalCheck());
     modalObserver.observe(document.body, { childList: true, subtree: true });
     scheduleModalCheck();
+
+    // Observe only the right-side ChatGPT Activity sidebar (multitasking), not center/left panels
+    function attachSidebarObservers() {
+      const sidebar = getChatGPTActivitySidebarElement();
+      if (sidebar) {
+        if (!window.tocChatGPTSidebarResizeObserver || window.tocChatGPTSidebarObservedEl !== sidebar) {
+          if (window.tocChatGPTSidebarResizeObserver) {
+            window.tocChatGPTSidebarResizeObserver.disconnect();
+            window.tocChatGPTSidebarResizeObserver = null;
+          }
+          window.tocChatGPTSidebarObservedEl = sidebar;
+          window.tocChatGPTSidebarResizeObserver = new ResizeObserver(() => applyTOCRightForSidebar());
+          window.tocChatGPTSidebarResizeObserver.observe(sidebar);
+        }
+        applyTOCRightForSidebar();
+      } else {
+        if (window.tocChatGPTSidebarResizeObserver) {
+          window.tocChatGPTSidebarResizeObserver.disconnect();
+          window.tocChatGPTSidebarResizeObserver = null;
+          window.tocChatGPTSidebarObservedEl = null;
+        }
+        applyTOCRightForSidebar();
+      }
+    }
+    if (!window.tocChatGPTSidebarBodyObserver) {
+      window.tocChatGPTSidebarBodyObserver = new MutationObserver(() => attachSidebarObservers());
+      window.tocChatGPTSidebarBodyObserver.observe(document.body, { childList: true, subtree: true });
+    }
+    attachSidebarObservers();
 
     console.log('ChatGPT TOC Extension initialized.');
   }
