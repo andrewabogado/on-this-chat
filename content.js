@@ -33,6 +33,16 @@
   let isManualTOCScrolling = false;
   let tocScrollTimeout = null;
 
+  /** Trigger buttery slide-in animation for TOC list (run after setting display: block). */
+  function triggerTOCSlideIn(container) {
+    if (!container) return;
+    container.classList.remove('toc-loaded');
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        container.classList.add('toc-loaded');
+      });
+    });
+  }
 
   // --- Core Logic ---
 
@@ -705,10 +715,12 @@
       // Only show TOC if preloading is complete
       if (preloadComplete) {
         container.style.display = 'block';
+        triggerTOCSlideIn(container);
         updateTOCVisibilityForModal();
         applyTOCRightForSidebar();
       } else {
         container.style.display = 'none';
+        container.classList.remove('toc-loaded');
       }
 
       // Notion-style compact mode (below 1660px): dash rail + popover on hover
@@ -1640,6 +1652,7 @@
     const container = document.getElementById(SETTINGS.sidebarId);
     if (container) {
       container.style.display = 'none';
+      container.classList.remove('toc-loaded');
       container.innerHTML = '';
     }
 
@@ -1938,6 +1951,7 @@
         if (container) {
           if (initialStructure.length > 0) {
             container.style.display = 'block';
+            triggerTOCSlideIn(container);
             updateTOCVisibilityForModal();
           }
         }
@@ -1971,6 +1985,7 @@
             const structure = parseConversation();
             if (structure.length > 0) {
               container.style.display = 'block';
+              triggerTOCSlideIn(container);
               updateTOCVisibilityForModal();
             }
           }
@@ -1989,6 +2004,7 @@
           const container = document.getElementById(SETTINGS.sidebarId);
           if (container) {
             container.style.display = 'block';
+            triggerTOCSlideIn(container);
             updateTOCVisibilityForModal();
           }
         }
