@@ -374,6 +374,7 @@
     right: 100%;
     top: 0;
     margin-right: 10px;
+    margin-top: -24px;
     width: 260px;
     max-height: 70vh;
     color: rgb(13, 13, 13);
@@ -387,7 +388,10 @@
     visibility: hidden;
     pointer-events: none;
     transform: translateX(24px);
-    transition: transform 0.55s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.45s cubic-bezier(0.22, 1, 0.36, 1), visibility 0.45s ease;
+    transition:
+      transform 0.4s cubic-bezier(0.22, 1, 0.36, 1),
+      opacity 0.35s cubic-bezier(0.22, 1, 0.36, 1),
+      visibility 0s linear 0.35s;
     z-index: 20;
     display: flex;
     flex-direction: column;
@@ -400,8 +404,11 @@
     opacity: 1;
     visibility: visible;
     pointer-events: auto;
-    margin-top: -24px;
     transform: translateX(0);
+    transition:
+      transform 0.55s cubic-bezier(0.22, 1, 0.36, 1),
+      opacity 0.45s cubic-bezier(0.22, 1, 0.36, 1),
+      visibility 0s linear 0s;
   }
 
   .toc-popover-header {
