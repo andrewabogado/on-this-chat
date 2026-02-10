@@ -2,7 +2,9 @@
 
 A Chrome extension that adds a **table of contents** to ChatGPT conversations.
 
-**Author:** [Andrew Abogado](https://github.com/andrewabogado) Handy for long threads: jump to any user message or assistant section (H1/H2) from a sidebar or compact rail.
+**Author:** [Andrew Abogado](https://github.com/andrewabogado) · **Repo:** [github.com/andrewabogado/on-this-chat](https://github.com/andrewabogado/on-this-chat)
+
+Handy for long threads: jump to any user message or assistant section (H1/H2) from a sidebar or compact rail.
 
 ## Features
 
@@ -14,7 +16,7 @@ A Chrome extension that adds a **table of contents** to ChatGPT conversations.
 
 ## Installation
 
-1. Clone or download this repo.
+1. Clone or download from [github.com/andrewabogado/on-this-chat](https://github.com/andrewabogado/on-this-chat).
 2. Open Chrome → **Extensions** → **Manage extensions** → **Load unpacked**.
 3. Select the folder containing `manifest.json`.
 4. Visit a ChatGPT conversation; the TOC appears when the page has content.
