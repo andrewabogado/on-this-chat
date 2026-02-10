@@ -1,14 +1,15 @@
 {
   "manifest_version": 3,
-  "name": "ChatGPT TOC Assistant",
+  "name": "On This Chat",
   "version": "1.1",
-  "description": "Generates a Table of Contents for ChatGPT conversations.",
+  "author": "Andrew Abogado (https://github.com/andrewabogado)",
+  "description": "Generates table of contents for ChatGPT. Perfect for long conversations.",
   "permissions": [
     "activeTab",
     "scripting"
   ],
   "action": {
-    "default_title": "Toggle Table of Contents"
+    "default_title": "Toggle On This Chat"
   },
   "background": {
     "service_worker": "background.js"
