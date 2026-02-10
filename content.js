@@ -1184,7 +1184,10 @@
   setTimeout(findScrollContainer, 500);
   setTimeout(findScrollContainer, 2000);
   function setActiveLink(targetId, skipScroll = false) {
-    if (!targetId) return;
+    if (!targetId || typeof targetId !== 'string') return;
+
+    // Escape for safe use in CSS attribute selector (defense in depth; IDs come from our structure).
+    const safeTargetId = CSS.escape(targetId);
 
     // Performance optimization: Don't re-do everything if ID hasn't changed.
     // Can store currentActiveId variable.
@@ -1198,7 +1201,7 @@
     document.querySelectorAll('.toc-link.active').forEach(l => l.classList.remove('active'));
 
     // 1. Find the target link(s) and set active (sidebar + popover)
-    const links = document.querySelectorAll(`.toc-link[data-target="${targetId}"]`);
+    const links = document.querySelectorAll(`.toc-link[data-target="${safeTargetId}"]`);
     const link = links.length > 0 ? links[0] : null;
     links.forEach(l => l.classList.add('active'));
 
@@ -1219,7 +1222,7 @@
       // Use the link inside the sidebar scroll area (not the popover clone) for correct coordinates
       if (!skipScroll && !isManualTOCScrolling) {
         const scrollArea = document.querySelector('.toc-scroll-area');
-        const sidebarLink = scrollArea ? scrollArea.querySelector(`.toc-link[data-target="${targetId}"]`) : null;
+        const sidebarLink = scrollArea ? scrollArea.querySelector(`.toc-link[data-target="${safeTargetId}"]`) : null;
         // Only scroll when sidebar list is visible (e.g. not in compact popover-only mode)
         if (scrollArea && sidebarLink && scrollArea.clientHeight > 0) {
           // Use getBoundingClientRect for accurate positioning
@@ -2154,6 +2157,23 @@
     attachSidebarObservers();
 
     console.log('ChatGPT TOC Extension initialized.');
+  }
+
+  // Handle messages from the extension background (e.g. toolbar click). Only accept known actions.
+  if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
+    chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+      if (!message || message.action !== 'TOGGLE_SIDEBAR') {
+        sendResponse({ ok: false });
+        return;
+      }
+      const container = document.getElementById(SETTINGS.sidebarId);
+      if (container) {
+        const isHidden = container.style.display === 'none' || window.getComputedStyle(container).display === 'none';
+        container.style.display = isHidden ? 'block' : 'none';
+        if (isHidden) triggerTOCSlideIn(container);
+      }
+      sendResponse({ ok: true });
+    });
   }
 
   // Run slightly delayed to ensure DOM is ready if run_at is document_start

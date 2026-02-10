@@ -40,6 +40,10 @@ Handy for long threads: jump to any user message or assistant section (H1/H2) fr
 
 Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for how to run, test, and submit changes.
 
+## Security
+
+See [SECURITY.md](SECURITY.md) for practices and how to report vulnerabilities.
+
 ## License
 
 MIT — see [LICENSE](LICENSE).
