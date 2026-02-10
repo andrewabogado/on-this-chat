@@ -150,9 +150,7 @@
 }
 
 /* Expanded State (Keep parent active color) */
-/* Expanded State (Keep parent active color) */
 /* Expanded logic removed for flat list */
-
 /* Follow-up Icon - Hanging bullet style */
 .toc-follow-up-icon {
   color: #9ca3af;
@@ -213,7 +211,6 @@
   min-height: 0;
   height: calc(100% - 20px);
   overflow-y: auto;
-  /* overflow-x: visible; */
   padding-bottom: 40px;
   /* Increased space matching fade height */
   /* Hide Scrollbar */
@@ -562,10 +559,6 @@
 
   /* Compact / dash rail dark mode */
   @media (max-width: 1659px) {
-    /* .toc-dash-rail::before {
-      background: #3f3f46;
-    } */
-
     .toc-dash-item {
       background: #52525b;
     }
