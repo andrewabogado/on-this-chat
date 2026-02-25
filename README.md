@@ -1,18 +1,14 @@
 # On This Chat
 
-A Chrome extension that adds a **table of contents** to ChatGPT conversations.
-
-**Author:** [Andrew Abogado](https://github.com/andrewabogado) · **Repo:** [github.com/andrewabogado/on-this-chat](https://github.com/andrewabogado/on-this-chat)
-
-Handy for long threads: jump to any user message or assistant section (H1/H2) from a sidebar or compact rail.
+A Chrome extension that adds a **table of contents** to ChatGPT conversations. Handy for long threads: jump to any user message or assistant section (H1/H2) from a sidebar or compact rail.
 
 ### Preview
 
-| Sidebar (wide) | Compact rail | Popover |
+| Wide | Compact Rail | Popover |
 |----------------|---------------|---------|
 | <img src="assets/sidebar.png" alt="Sidebar TOC" style="height: 280px; width: auto;"> | <img src="assets/rail.png" alt="Compact rail" style="height: 280px; width: auto;"> | <img src="assets/popover.png" alt="TOC popover" style="height: 280px; width: auto;"> |
 
-**[Youtube - Demo Video](https://youtu.be/hdd1kYpZy4E)**
+**[Video walkthrough 👉](https://youtu.be/hdd1kYpZy4E)**
 
 ## Features
 
